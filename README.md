@@ -1,6 +1,6 @@
 # LoveLink
 
-Last updated (UTC): 2026-03-06 10:30
+Last updated (UTC): 2026-03-06 10:50
 
 LoveLink is a private, always-on live presence portal for Agenor and Snooky.
 
@@ -20,7 +20,7 @@ This repository now includes a complete **run + usage guide** so you can start t
 - Mobile-first single-screen layout with top video feed and no page scrolling.
 - Role selection on login (Host/Viewer) with immediate stream startup after login.
 - Swipeable Feed ↔ Memories tabs and streamlined compact memory cards with delete actions.
-- Android-friendly UI polish: PiP video button (if browser/device supports it), sticker strip, custom emoji reactions, and a customization panel (themes + visual density).
+- Android-friendly UI polish: sticker strip, GIF quick send, full custom emoji reactions, hold-to-talk voice notes, and a customization panel (themes + visual density).
 
 ## Quick Start
 

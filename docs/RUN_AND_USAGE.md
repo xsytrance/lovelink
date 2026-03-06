@@ -1,6 +1,6 @@
 # LoveLink Run & Usage Guide
 
-Last updated (UTC): 2026-03-06 10:30
+Last updated (UTC): 2026-03-06 10:50
 
 This guide explains exactly how to run this build and how to use every major feature.
 
@@ -192,6 +192,9 @@ Use this quick sequence each time:
 
 - Use the floating **🎨** button to open customization controls.
 - Choose themes (including 🇺🇸 and 🇵🇭 inspired palettes), toggle compact chat bubbles, and toggle glass cards.
-- Use **PiP** button for floating video when your mobile browser supports Picture-in-Picture.
 - Reactions now support any emoji via the custom emoji input.
 - Stickers are available in feed (sticker strip) and memories (sticker comment shortcut).
+
+- Use **Hold to Talk 🎤** in Feed to record and send quick voice notes.
+- Use the GIF row to send animated reactions quickly.
+- Custom emoji input supports the full emoji range for reactions and memories.

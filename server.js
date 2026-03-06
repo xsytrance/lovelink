@@ -247,6 +247,7 @@ const server = http.createServer(async (req, res) => {
     if (body.type === 'reaction') sendEvent('reaction', body.payload);
     if (body.type === 'miss-you') sendEvent('miss-you', { message: 'Snooky sent you a ❤️', timestamp: Date.now() });
     if (body.type === 'mood') sendEvent('mood', body.payload);
+    if (body.type === 'voice-message') sendEvent('voice-message', body.payload);
 
     return json(res, 200, { ok: true });
   }

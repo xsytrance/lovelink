@@ -5,6 +5,8 @@ let peerConnection = null;
 let eventSource = null;
 let openedMemory = null;
 let activeTab = 0;
+let mediaRecorder = null;
+let voiceChunks = [];
 
 const THEMES = [
   { name: 'Pixel Pink', vars: { '--primary': '#ff4f98', '--primary-2': '#7d67ff', '--bg': '#f8f4ff', '--bg-2': '#fff8fc' } },
@@ -15,6 +17,13 @@ const THEMES = [
 ];
 
 const STICKERS = ['🧸', '🌙', '💖', '✨', '🐼', '🎀', '🐣', '🍓', '🌸', '🥹'];
+const GIFS = [
+  'https://media.giphy.com/media/3o7aD2saalBwwftBIY/giphy.gif',
+  'https://media.giphy.com/media/l0MYt5jPR6QX5pnqM/giphy.gif',
+  'https://media.giphy.com/media/26BRv0ThflsHCqDrG/giphy.gif',
+  'https://media.giphy.com/media/ICOgUNjpvO0PC/giphy.gif',
+  'https://media.giphy.com/media/5GoVLqeAOo6PK/giphy.gif'
+];
 
 function createClientId() {
   if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') return crypto.randomUUID();
@@ -41,15 +50,17 @@ const el = {
   localVideo: document.getElementById('localVideo'),
   remoteVideo: document.getElementById('remoteVideo'),
   captureBtn: document.getElementById('captureBtn'),
-  pipBtn: document.getElementById('pipBtn'),
   moments: document.getElementById('moments'),
   chatLog: document.getElementById('chatLog'),
   chatInput: document.getElementById('chatInput'),
   sendBtn: document.getElementById('sendBtn'),
   typingIndicator: document.getElementById('typingIndicator'),
   missYouBtn: document.getElementById('missYouBtn'),
+  holdTalkBtn: document.getElementById('holdTalkBtn'),
   memoryModal: document.getElementById('memoryModal'),
   memoryModalImage: document.getElementById('memoryModalImage'),
+  memoryDetails: document.getElementById('memoryDetails'),
+  memoryComments: document.getElementById('memoryComments'),
   memorySaveBtn: document.getElementById('memorySaveBtn'),
   memoryDeleteBtn: document.getElementById('memoryDeleteBtn'),
   memoryCloseBtn: document.getElementById('memoryCloseBtn'),
@@ -60,6 +71,7 @@ const el = {
   customReactionInput: document.getElementById('customReactionInput'),
   customReactionBtn: document.getElementById('customReactionBtn'),
   stickerRow: document.getElementById('stickerRow'),
+  gifRow: document.getElementById('gifRow'),
   customizeBtn: document.getElementById('customizeBtn'),
   customizePanel: document.getElementById('customizePanel'),
   themeSelect: document.getElementById('themeSelect'),
@@ -87,18 +99,53 @@ function setTab(index) {
   el.memoriesTabBtn.classList.toggle('active', index === 1);
 }
 
-function appendChatItem(text, kind = 'system') {
-  const item = document.createElement('div');
-  item.className = `chat-item ${kind}`;
-  item.textContent = text;
-  el.chatLog.appendChild(item);
+function appendChatNode(node, kind = 'system') {
+  node.classList.add('chat-item', kind);
+  el.chatLog.appendChild(node);
   const kids = [...el.chatLog.children];
-  if (kids.length > 8) kids.slice(0, kids.length - 8).forEach((k) => k.remove());
+  if (kids.length > 12) kids.slice(0, kids.length - 12).forEach((k) => k.remove());
+}
+
+function appendChatItem(text, kind = 'system') {
+  const node = document.createElement('div');
+  node.textContent = text;
+  appendChatNode(node, kind);
+}
+
+function appendGifMessage(label, gifUrl, kind = 'viewer') {
+  const node = document.createElement('div');
+  node.innerHTML = `<div>${label}</div><img class="gif" src="${gifUrl}" alt="gif" loading="lazy" />`;
+  appendChatNode(node, kind);
+}
+
+function appendVoiceMessage(label, audioData, kind = 'viewer') {
+  const node = document.createElement('div');
+  const audio = document.createElement('audio');
+  audio.controls = true;
+  audio.src = audioData;
+  node.append(label, audio);
+  appendChatNode(node, kind);
 }
 
 function openMemoryModal(moment) {
   openedMemory = moment;
   el.memoryModalImage.src = moment.imageData;
+  el.memoryDetails.textContent = `${new Date(moment.timestamp).toLocaleString()} · ${moment.capturedBy}`;
+  el.memoryComments.innerHTML = '';
+  const comments = moment.comments || [];
+  if (!comments.length) {
+    const c = document.createElement('div');
+    c.className = 'memory-comment';
+    c.textContent = 'No comments yet.';
+    el.memoryComments.appendChild(c);
+  } else {
+    comments.forEach((comment) => {
+      const c = document.createElement('div');
+      c.className = 'memory-comment';
+      c.innerHTML = `<b>${comment.author}</b>: ${comment.text}`;
+      el.memoryComments.appendChild(c);
+    });
+  }
   el.memoryModal.classList.remove('hidden');
 }
 
@@ -140,15 +187,8 @@ function initCustomization() {
   });
 
   el.themeSelect.onchange = () => applyTheme(THEMES[Number(el.themeSelect.value)].vars);
-
-  el.compactToggle.onchange = () => {
-    document.body.style.setProperty('--radius', el.compactToggle.checked ? '12px' : '18px');
-  };
-
-  el.glassToggle.onchange = () => {
-    const surface = el.glassToggle.checked ? 'rgba(255, 255, 255, 0.78)' : '#ffffff';
-    document.documentElement.style.setProperty('--surface', surface);
-  };
+  el.compactToggle.onchange = () => document.documentElement.style.setProperty('--radius', el.compactToggle.checked ? '12px' : '18px');
+  el.glassToggle.onchange = () => document.documentElement.style.setProperty('--surface', el.glassToggle.checked ? 'rgba(255,255,255,0.82)' : '#ffffff');
 
   el.customizeBtn.onclick = () => el.customizePanel.classList.toggle('hidden');
   document.addEventListener('click', (event) => {
@@ -157,7 +197,7 @@ function initCustomization() {
   });
 }
 
-function initStickers() {
+function initStickersAndGifs() {
   el.stickerRow.innerHTML = '';
   STICKERS.forEach((sticker) => {
     const btn = document.createElement('button');
@@ -165,6 +205,15 @@ function initStickers() {
     btn.textContent = sticker;
     btn.onclick = () => sendEvent('chat-message', { text: `Sticker ${sticker}`, username, clientId });
     el.stickerRow.appendChild(btn);
+  });
+
+  el.gifRow.innerHTML = '';
+  GIFS.forEach((gifUrl, idx) => {
+    const btn = document.createElement('button');
+    btn.className = 'btn btn-soft';
+    btn.textContent = `GIF ${idx + 1}`;
+    btn.onclick = () => sendEvent('chat-message', { text: `GIF|${gifUrl}`, username, clientId });
+    el.gifRow.appendChild(btn);
   });
 }
 
@@ -185,7 +234,6 @@ function onAuthenticated() {
 
 async function startSelectedRole() {
   await sendEvent('set-role', { role, clientId });
-
   if (role === 'host') {
     localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
     el.localVideo.srcObject = localStream;
@@ -209,7 +257,17 @@ function connectEvents() {
 
   on('chat-message', ({ text, username: who, timestamp }) => {
     const kind = who === username ? 'host' : 'viewer';
-    appendChatItem(`[${new Date(timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}] ${who}: ${text}`, kind);
+    const header = `[${new Date(timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}] ${who}: `;
+    if (typeof text === 'string' && text.startsWith('GIF|')) {
+      appendGifMessage(`${header}sent a GIF`, text.split('|')[1], kind);
+      return;
+    }
+    appendChatItem(`${header}${text}`, kind);
+  });
+
+  on('voice-message', ({ username: who, audioData }) => {
+    const kind = who === username ? 'host' : 'viewer';
+    appendVoiceMessage(`${who} sent a voice note`, audioData, kind);
   });
 
   on('typing', ({ username: who, clientId: from }) => {
@@ -234,7 +292,6 @@ function connectEvents() {
 
   on('signal', async (data) => {
     if (data.to && data.to !== clientId) return;
-
     if (data.type === 'viewer-ready' && role === 'host' && localStream) {
       setupPeerConnection();
       localStream.getTracks().forEach((track) => peerConnection.addTrack(track, localStream));
@@ -242,7 +299,6 @@ function connectEvents() {
       await peerConnection.setLocalDescription(offer);
       await sendEvent('signal', { type: 'offer', offer, from: clientId, to: data.from || data.clientId });
     }
-
     if (data.type === 'offer' && role === 'viewer') {
       setupPeerConnection();
       await peerConnection.setRemoteDescription(new RTCSessionDescription(data.offer));
@@ -250,14 +306,8 @@ function connectEvents() {
       await peerConnection.setLocalDescription(answer);
       await sendEvent('signal', { type: 'answer', answer, from: clientId, to: data.from });
     }
-
-    if (data.type === 'answer' && peerConnection) {
-      await peerConnection.setRemoteDescription(new RTCSessionDescription(data.answer));
-    }
-
-    if (data.type === 'ice' && peerConnection && data.candidate) {
-      await peerConnection.addIceCandidate(new RTCIceCandidate(data.candidate));
-    }
+    if (data.type === 'answer' && peerConnection) await peerConnection.setRemoteDescription(new RTCSessionDescription(data.answer));
+    if (data.type === 'ice' && peerConnection && data.candidate) await peerConnection.addIceCandidate(new RTCIceCandidate(data.candidate));
   });
 }
 
@@ -289,32 +339,16 @@ function setupPeerConnection() {
 el.captureBtn.onclick = async () => {
   const sourceVideo = role === 'host' ? el.localVideo : el.remoteVideo;
   if (!sourceVideo.srcObject) return;
-
   const maxWidth = 640;
   const maxHeight = 360;
   const ratio = Math.min(maxWidth / (sourceVideo.videoWidth || 640), maxHeight / (sourceVideo.videoHeight || 360), 1);
-
   const canvas = document.createElement('canvas');
   canvas.width = Math.floor((sourceVideo.videoWidth || 640) * ratio);
   canvas.height = Math.floor((sourceVideo.videoHeight || 360) * ratio);
   canvas.getContext('2d').drawImage(sourceVideo, 0, 0, canvas.width, canvas.height);
-
   await api('/api/moments', 'POST', { imageData: canvas.toDataURL('image/jpeg', 0.74), capturedBy: username });
   await loadMoments();
   setTab(1);
-};
-
-el.pipBtn.onclick = async () => {
-  try {
-    const active = role === 'host' ? el.localVideo : el.remoteVideo;
-    if (!document.pictureInPictureEnabled || !active || !active.srcObject) {
-      appendChatItem('PiP is unavailable on this device/browser.', 'system');
-      return;
-    }
-    await active.requestPictureInPicture();
-  } catch {
-    appendChatItem('PiP could not be started here.', 'system');
-  }
 };
 
 async function reactToMoment(id, emoji) {
@@ -339,7 +373,6 @@ function renderReactionSummary(reactions) {
 function createMomentCard(moment) {
   const card = document.createElement('div');
   card.className = 'memory-card';
-
   card.innerHTML = `
     <div class="memory-thumb"><img src="${moment.imageData}" alt="memory" loading="lazy" /></div>
     <div class="memory-meta">${new Date(moment.timestamp).toLocaleDateString()} · ${moment.capturedBy}</div>
@@ -355,7 +388,6 @@ function createMomentCard(moment) {
       <button class="btn btn-soft" data-emoji-add="1">Add</button>
     </div>
   `;
-
   card.querySelector('img').onclick = () => openMemoryModal(moment);
   card.querySelector('[data-heart]').onclick = () => reactToMoment(moment.id, '❤️');
   card.querySelector('[data-comment]').onclick = () => commentOnMoment(moment.id);
@@ -365,14 +397,13 @@ function createMomentCard(moment) {
     const v = card.querySelector('.mem-emoji').value.trim();
     reactToMoment(moment.id, v);
   };
-
   return card;
 }
 
 async function loadMoments() {
   const { moments } = await api('/api/moments');
   el.moments.innerHTML = '';
-  moments.slice(0, 6).forEach((moment) => el.moments.appendChild(createMomentCard(moment)));
+  moments.slice(0, 8).forEach((moment) => el.moments.appendChild(createMomentCard(moment)));
 }
 
 async function handleSendMessage() {
@@ -382,25 +413,46 @@ async function handleSendMessage() {
   el.chatInput.value = '';
 }
 
+async function startRecordingVoice() {
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    voiceChunks = [];
+    mediaRecorder = new MediaRecorder(stream);
+    mediaRecorder.ondataavailable = (e) => e.data.size && voiceChunks.push(e.data);
+    mediaRecorder.onstop = async () => {
+      const blob = new Blob(voiceChunks, { type: mediaRecorder.mimeType || 'audio/webm' });
+      const reader = new FileReader();
+      reader.onloadend = async () => {
+        await sendEvent('voice-message', { username, audioData: reader.result });
+        stream.getTracks().forEach((t) => t.stop());
+      };
+      reader.readAsDataURL(blob);
+    };
+    mediaRecorder.start();
+    el.holdTalkBtn.classList.add('recording');
+    el.holdTalkBtn.textContent = 'Recording... release to send';
+  } catch {
+    appendChatItem('Voice message not available on this browser/device.', 'system');
+  }
+}
+
+function stopRecordingVoice() {
+  if (!mediaRecorder || mediaRecorder.state === 'inactive') return;
+  mediaRecorder.stop();
+  el.holdTalkBtn.classList.remove('recording');
+  el.holdTalkBtn.textContent = 'Hold to Talk 🎤';
+}
+
 el.loginBtn.onclick = handleLogin;
 el.sendBtn.onclick = handleSendMessage;
-
 el.chatInput.onkeydown = (event) => {
-  if (event.key === 'Enter') {
-    event.preventDefault();
-    handleSendMessage();
-  }
+  if (event.key === 'Enter') { event.preventDefault(); handleSendMessage(); }
 };
-
 [el.username, el.password].forEach((input) => {
   input.addEventListener('keydown', (event) => {
-    if (event.key === 'Enter') {
-      event.preventDefault();
-      handleLogin();
-    }
+    if (event.key === 'Enter') { event.preventDefault(); handleLogin(); }
   });
 });
-
 el.chatInput.oninput = () => sendEvent('typing', { username, clientId });
 
 document.querySelectorAll('.reactBtn').forEach((btn) => {
@@ -413,23 +465,21 @@ el.customReactionBtn.onclick = () => {
   sendEvent('reaction', { emoji: value, username });
   el.customReactionInput.value = '';
 };
-
 el.customReactionInput.onkeydown = (event) => {
-  if (event.key === 'Enter') {
-    event.preventDefault();
-    el.customReactionBtn.click();
-  }
+  if (event.key === 'Enter') { event.preventDefault(); el.customReactionBtn.click(); }
 };
+
+el.holdTalkBtn.addEventListener('pointerdown', startRecordingVoice);
+el.holdTalkBtn.addEventListener('pointerup', stopRecordingVoice);
+el.holdTalkBtn.addEventListener('pointercancel', stopRecordingVoice);
+el.holdTalkBtn.addEventListener('pointerleave', (e) => { if (e.buttons === 1) stopRecordingVoice(); });
 
 el.missYouBtn.onclick = () => sendEvent('miss-you', { username });
 el.feedTabBtn.onclick = () => setTab(0);
 el.memoriesTabBtn.onclick = () => setTab(1);
 
 let touchStartX = 0;
-el.swipeShell.addEventListener('touchstart', (e) => {
-  touchStartX = e.changedTouches[0].clientX;
-}, { passive: true });
-
+el.swipeShell.addEventListener('touchstart', (e) => { touchStartX = e.changedTouches[0].clientX; }, { passive: true });
 el.swipeShell.addEventListener('touchend', (e) => {
   const dx = e.changedTouches[0].clientX - touchStartX;
   if (Math.abs(dx) < 35) return;
@@ -440,11 +490,9 @@ el.swipeShell.addEventListener('touchend', (e) => {
 el.memoryCloseBtn.onclick = closeMemoryModal;
 el.memorySaveBtn.onclick = saveOpenedMemory;
 el.memoryDeleteBtn.onclick = deleteOpenedMemory;
-el.memoryModal.onclick = (event) => {
-  if (event.target === el.memoryModal) closeMemoryModal();
-};
+el.memoryModal.onclick = (event) => { if (event.target === el.memoryModal) closeMemoryModal(); };
 
 setTab(0);
 initCustomization();
-initStickers();
+initStickersAndGifs();
 checkSession();
