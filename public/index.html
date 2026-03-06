@@ -1,0 +1,337 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <title>LoveLink</title>
+    <style>
+      :root {
+        --pink: #ff5fa2;
+        --rose: #ff2f7d;
+        --violet: #8f6bff;
+        --bg: #fff5fb;
+        --text: #34192b;
+        --muted: #846275;
+        --line: #ffd3e8;
+      }
+
+      * { box-sizing: border-box; }
+
+      html, body {
+        margin: 0;
+        height: 100%;
+        overflow: hidden;
+        font-family: Inter, ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+        color: var(--text);
+        background: radial-gradient(circle at top left, #ffe1f1 0%, var(--bg) 50%, #fff 100%);
+      }
+
+      .hidden { display: none !important; }
+
+      .topbar {
+        height: 52px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 0 12px;
+        color: white;
+        background: linear-gradient(125deg, var(--pink), var(--rose), var(--violet));
+        box-shadow: 0 8px 20px rgba(255, 47, 125, 0.25);
+      }
+
+      .brand { font-size: 1.1rem; font-weight: 800; }
+      .status { font-size: 0.72rem; text-align: right; max-width: 66%; }
+
+      .login-screen {
+        height: calc(100vh - 52px);
+        padding: 16px;
+        display: grid;
+        place-items: center;
+      }
+
+      .login-card {
+        width: min(460px, 100%);
+        background: rgba(255,255,255,0.86);
+        border: 1px solid var(--line);
+        border-radius: 20px;
+        box-shadow: 0 18px 40px rgba(255, 95, 162, 0.2);
+        padding: 16px;
+      }
+
+      .title { margin: 0 0 10px; }
+      .field {
+        width: 100%;
+        border-radius: 12px;
+        border: 1px solid #e5b6cd;
+        padding: 11px;
+        margin-bottom: 10px;
+        font-size: 0.95rem;
+      }
+
+      .btn {
+        border: 0;
+        border-radius: 12px;
+        padding: 10px 12px;
+        font-weight: 700;
+      }
+      .btn-primary {
+        background: linear-gradient(130deg, var(--pink), var(--rose));
+        color: white;
+      }
+      .btn-soft {
+        background: #ffe8f3;
+        color: #59273f;
+        border: 1px solid #ffc7df;
+      }
+      .btn-danger {
+        background: linear-gradient(130deg, #ff5d73, #ff3d60);
+        color: white;
+      }
+
+      .app {
+        height: calc(100vh - 52px);
+        display: grid;
+        grid-template-rows: auto auto 1fr auto;
+        padding: 8px;
+        gap: 8px;
+      }
+
+      .video-wrap {
+        border-radius: 16px;
+        overflow: hidden;
+        border: 1px solid #ffc0de;
+        box-shadow: 0 10px 20px rgba(255, 95, 162, 0.2);
+        background: #130912;
+      }
+
+      video {
+        width: 100%;
+        aspect-ratio: 16 / 9;
+        display: block;
+        object-fit: cover;
+        background: #10070f;
+      }
+
+      .controls {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 8px;
+      }
+
+      .tabs {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 8px;
+      }
+
+      .tab-btn.active {
+        background: linear-gradient(125deg, var(--pink), var(--rose));
+        color: white;
+      }
+
+      .swipe-shell {
+        overflow: hidden;
+        border-radius: 16px;
+        border: 1px solid var(--line);
+        background: rgba(255,255,255,0.75);
+      }
+
+      .swipe-track {
+        height: 100%;
+        display: flex;
+        width: 200%;
+        transform: translateX(0%);
+        transition: transform 260ms ease;
+      }
+
+      .pane {
+        width: 50%;
+        padding: 10px;
+        display: grid;
+        gap: 8px;
+        align-content: start;
+        height: 100%;
+      }
+
+      .chat-log {
+        display: grid;
+        gap: 6px;
+      }
+
+      .chat-item {
+        font-size: 0.82rem;
+        padding: 7px 10px;
+        border-radius: 12px;
+        border: 1px solid #f0cfe0;
+      }
+      .chat-item.viewer { background: #fff1f8; }
+      .chat-item.host { background: #eaf0ff; border-color: #c9d8ff; margin-left: 22px; }
+      .chat-item.system { background: #fff8e8; border-color: #f6e0b3; text-align: center; }
+
+      .composer { display: flex; gap: 8px; }
+      .composer input { margin: 0; flex: 1; }
+
+      .quick-reactions {
+        display: grid;
+        grid-template-columns: repeat(5, minmax(0, 1fr));
+        gap: 6px;
+      }
+
+      .mem-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 8px;
+      }
+
+      .memory-card {
+        background: linear-gradient(145deg, #fff, #fff2f9);
+        border: 1px solid #ffcce4;
+        border-radius: 14px;
+        box-shadow: 0 8px 18px rgba(255, 95, 162, 0.18);
+        padding: 7px;
+      }
+
+      .memory-thumb {
+        width: 100%;
+        aspect-ratio: 16/9;
+        border-radius: 10px;
+        overflow: hidden;
+        border: 1px solid #ffc6e0;
+        background: repeating-linear-gradient(45deg,#ffe4f2,#ffe4f2 10px,#ffd9ea 10px,#ffd9ea 20px);
+      }
+
+      .memory-thumb img {
+        width: 100%;
+        height: 100%;
+        object-fit: contain;
+        background: #fff;
+        cursor: zoom-in;
+      }
+
+      .memory-meta { font-size: 0.7rem; color: var(--muted); margin-top: 6px; }
+      .memory-mini-actions { margin-top: 6px; display: flex; gap: 6px; flex-wrap: wrap; }
+      .memory-mini-actions .btn { padding: 5px 8px; font-size: 0.7rem; }
+
+      .footer-line {
+        font-size: 0.72rem;
+        color: var(--muted);
+        text-align: center;
+      }
+
+      .memory-modal {
+        position: fixed;
+        inset: 0;
+        z-index: 40;
+        background: rgba(20, 7, 15, 0.75);
+        display: grid;
+        place-items: center;
+        padding: 12px;
+      }
+
+      .memory-panel {
+        width: min(920px, 100%);
+        background: #fff;
+        border-radius: 16px;
+        border: 1px solid #ffcbe4;
+        box-shadow: 0 20px 40px rgba(0,0,0,0.3);
+        padding: 10px;
+      }
+
+      .memory-panel img {
+        width: 100%;
+        max-height: 70vh;
+        object-fit: contain;
+        background: #fff;
+        border-radius: 10px;
+        border: 1px solid #ffd5e8;
+      }
+
+      .memory-panel .row {
+        margin-top: 8px;
+        display: flex;
+        gap: 8px;
+        justify-content: flex-end;
+      }
+
+      @media (min-width: 900px) {
+        .app { max-width: 680px; margin: 0 auto; }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="topbar">
+      <div class="brand">LoveLink</div>
+      <div id="presence" class="status">Loading...</div>
+    </div>
+
+    <section id="loginCard" class="login-screen">
+      <div class="login-card">
+        <h2 class="title">Private Access</h2>
+        <input id="username" class="field" placeholder="Display name" value="Snooky" />
+        <input id="password" class="field" type="password" placeholder="Password" />
+        <select id="roleSelect" class="field">
+          <option value="viewer">Log in as Viewer</option>
+          <option value="host">Log in as Host</option>
+        </select>
+        <button id="loginBtn" class="btn btn-primary" style="width:100%;">Enter LoveLink</button>
+        <p id="loginError" style="color:#b1004e;min-height:1.1rem;"></p>
+      </div>
+    </section>
+
+    <main id="appRoot" class="app hidden">
+      <div class="video-wrap">
+        <video id="localVideo" autoplay playsinline muted class="hidden"></video>
+        <video id="remoteVideo" autoplay playsinline class="hidden"></video>
+      </div>
+
+      <div class="controls">
+        <button id="captureBtn" class="btn btn-soft">📸 Capture</button>
+        <button id="missYouBtn" class="btn btn-soft">Send ❤️</button>
+      </div>
+
+      <div class="tabs">
+        <button id="feedTabBtn" class="btn btn-soft tab-btn active">Feed</button>
+        <button id="memoriesTabBtn" class="btn btn-soft tab-btn">Memories</button>
+      </div>
+
+      <div id="swipeShell" class="swipe-shell">
+        <div id="swipeTrack" class="swipe-track">
+          <section class="pane">
+            <div id="typingIndicator" class="footer-line"></div>
+            <div id="chatLog" class="chat-log"></div>
+            <div class="composer">
+              <input id="chatInput" class="field" placeholder="Say something sweet..." />
+              <button id="sendBtn" class="btn btn-primary">Send</button>
+            </div>
+            <div class="quick-reactions">
+              <button class="btn btn-soft reactBtn">❤️</button>
+              <button class="btn btn-soft reactBtn">😂</button>
+              <button class="btn btn-soft reactBtn">😍</button>
+              <button class="btn btn-soft reactBtn">🔥</button>
+              <button class="btn btn-soft reactBtn">😴</button>
+            </div>
+          </section>
+
+          <section class="pane">
+            <div class="footer-line">Memories (latest 6)</div>
+            <div id="moments" class="mem-grid"></div>
+            <div class="footer-line">Tap a memory to open full view</div>
+          </section>
+        </div>
+      </div>
+    </main>
+
+    <div id="memoryModal" class="memory-modal hidden">
+      <div class="memory-panel">
+        <img id="memoryModalImage" alt="memory" />
+        <div class="row">
+          <button id="memorySaveBtn" class="btn btn-soft">Save</button>
+          <button id="memoryDeleteBtn" class="btn btn-danger">Delete</button>
+          <button id="memoryCloseBtn" class="btn btn-primary">Close</button>
+        </div>
+      </div>
+    </div>
+
+    <script src="/main.js"></script>
+  </body>
+</html>
