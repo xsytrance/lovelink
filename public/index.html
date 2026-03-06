@@ -1,0 +1,149 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>LoveLink</title>
+    <style>
+      :root {
+        --primary-pink: #ff5fa2;
+        --soft-pink: #ffd1e8;
+        --rose-accent: #ff2f7d;
+        --background: #fff5fa;
+      }
+      body {
+        margin: 0;
+        font-family: system-ui, sans-serif;
+        background: var(--background);
+        color: #3c1f31;
+      }
+      .app {
+        display: grid;
+        grid-template-columns: 1.7fr 1fr;
+        gap: 16px;
+        padding: 16px;
+      }
+      .card {
+        background: white;
+        border: 2px solid var(--soft-pink);
+        border-radius: 16px;
+        padding: 12px;
+        box-shadow: 0 8px 24px rgba(255, 95, 162, 0.12);
+      }
+      h1, h2, h3 { margin-top: 0; }
+      button, select, input {
+        border-radius: 12px;
+        border: 1px solid #e3a7c3;
+        padding: 8px 10px;
+      }
+      button {
+        background: var(--primary-pink);
+        color: white;
+        border: none;
+        cursor: pointer;
+      }
+      .secondary { background: #ffe6f2; color: #4f1934; }
+      video {
+        width: 100%;
+        border-radius: 12px;
+        background: #000;
+        min-height: 300px;
+      }
+      .status { font-weight: 700; color: var(--rose-accent); }
+      .hidden { display: none; }
+      .chat-log, .moments {
+        max-height: 200px;
+        overflow: auto;
+        border: 1px solid #f2c3d9;
+        border-radius: 10px;
+        padding: 8px;
+      }
+      .moment {
+        border: 1px solid #ffd1e8;
+        border-radius: 10px;
+        margin-bottom: 8px;
+        padding: 8px;
+      }
+      .moment img { width: 100%; border-radius: 8px; }
+      .topbar {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 12px 16px;
+        background: linear-gradient(90deg, #ff5fa2, #ff2f7d);
+        color: white;
+      }
+      .floating-heart {
+        position: fixed;
+        font-size: 24px;
+        animation: floatUp 2s ease-out forwards;
+      }
+      @keyframes floatUp {
+        from { transform: translateY(0); opacity: 1; }
+        to { transform: translateY(-120px); opacity: 0; }
+      }
+      @media (max-width: 900px) { .app { grid-template-columns: 1fr; } }
+    </style>
+  </head>
+  <body>
+    <div class="topbar">
+      <h1>LoveLink</h1>
+      <div id="presence" class="status">Loading presence...</div>
+    </div>
+
+    <div id="loginCard" class="card" style="max-width: 460px; margin: 16px auto;">
+      <h2>Private Access</h2>
+      <input id="username" placeholder="Display name" value="Snooky" />
+      <input id="password" type="password" placeholder="Password" />
+      <button id="loginBtn">Enter LoveLink</button>
+      <p id="loginError" style="color:#b0004d"></p>
+    </div>
+
+    <main id="appRoot" class="app hidden">
+      <section class="card">
+        <h2>Presence</h2>
+        <p id="viewerStatus">Waiting for viewer...</p>
+        <video id="localVideo" autoplay playsinline muted class="hidden"></video>
+        <video id="remoteVideo" autoplay playsinline class="hidden"></video>
+        <div style="display:flex; gap:8px; flex-wrap:wrap; margin:8px 0;">
+          <button id="hostBtn">I am Prime (Host)</button>
+          <button id="viewerBtn" class="secondary">I am Snooky (Viewer)</button>
+          <button id="captureBtn" class="secondary">📸 Capture Moment</button>
+          <button id="missYouBtn" class="secondary">Send ❤️</button>
+        </div>
+        <div>
+          Mood:
+          <select id="moodSelect">
+            <option>Miss you</option>
+            <option>Watching you</option>
+            <option>Thinking of you</option>
+            <option>Laughing at you</option>
+          </select>
+          <button id="sendMoodBtn" class="secondary">Send Mood</button>
+        </div>
+      </section>
+
+      <section class="card">
+        <h3>Interaction</h3>
+        <div id="typingIndicator"></div>
+        <div id="chatLog" class="chat-log"></div>
+        <div style="display:flex; gap:8px; margin-top:8px;">
+          <input id="chatInput" placeholder="Say something sweet..." style="flex:1"/>
+          <button id="sendBtn">Send</button>
+        </div>
+        <div style="margin-top:8px; display:flex; gap:6px;">
+          <button class="secondary reactBtn">❤️</button>
+          <button class="secondary reactBtn">😂</button>
+          <button class="secondary reactBtn">😍</button>
+          <button class="secondary reactBtn">🔥</button>
+          <button class="secondary reactBtn">😴</button>
+        </div>
+
+        <h3 style="margin-top:14px;">Moments & Memories</h3>
+        <div id="moments" class="moments"></div>
+      </section>
+    </main>
+
+    <script src="/main.js"></script>
+  </body>
+</html>
