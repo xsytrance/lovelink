@@ -40,7 +40,7 @@ If you changed the password, use your `LOVE_LINK_PASSWORD` value.
 
 After login, each connected browser chooses a role:
 
-- **Host / Prime side**: click `I am Prime (Host)`.
+- **Host / Prime side**: click `I am Agenor (Host)`.
   - Browser asks for camera/mic permission.
   - Local preview appears.
 - **Viewer / Snooky side**: click `I am Snooky (Viewer)`.
@@ -131,7 +131,7 @@ To access from another device on your network:
 
 ### Viewer sees no video
 
-- Confirm host clicked `I am Prime (Host)`.
+- Confirm host clicked `I am Agenor (Host)`.
 - Confirm browser camera/mic permission is allowed.
 - Check both browsers are connected and viewer clicked `I am Snooky (Viewer)`.
 
@@ -160,6 +160,6 @@ Use this quick sequence each time:
 1. `npm start`
 2. Open URL in both host and viewer browsers.
 3. Login in both tabs/devices.
-4. Host clicks **I am Prime (Host)**.
+4. Host clicks **I am Agenor (Host)**.
 5. Viewer clicks **I am Snooky (Viewer)**.
 6. Validate stream, then use chat/reactions/moments.
