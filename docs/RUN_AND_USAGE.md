@@ -1,6 +1,6 @@
 # LoveLink Run & Usage Guide
 
-Last updated (UTC): 2026-03-06 10:50
+Last updated (UTC): 2026-03-06 12:00
 
 This guide explains exactly how to run this build and how to use every major feature.
 
@@ -179,7 +179,7 @@ Use this quick sequence each time:
 
 ## 13) Mobile single-screen flow
 
-- The app is now optimized as a **single-screen mobile experience** (no page scroll).
+- The app is optimized as a **single-screen mobile experience** with scrolling only where needed (e.g., memories/comments).
 - Video feed stays pinned at the top.
 - On login, choose **Host** or **Viewer** before entering.
 - After login, the selected role starts immediately (no extra role button tap).
@@ -188,7 +188,7 @@ Use this quick sequence each time:
 - Full viewer includes **Save**, **Delete**, and **Close**.
 
 
-## 14) Beauty & customization
+## 14) Beauty, customization, and expression
 
 - Use the floating **🎨** button to open customization controls.
 - Choose themes (including 🇺🇸 and 🇵🇭 inspired palettes), toggle compact chat bubbles, and toggle glass cards.
@@ -198,3 +198,7 @@ Use this quick sequence each time:
 - Use **Hold to Talk 🎤** in Feed to record and send quick voice notes.
 - Use the GIF row to send animated reactions quickly.
 - Custom emoji input supports the full emoji range for reactions and memories.
+
+- Equalizer overlays are shown directly on top of the video feed for live audio activity.
+- Main action row includes: Capture, heart (custom emoji), GIF send, feed on/off, audio on/off, theme cycle, and mood apply.
+- Reactions trigger animated floating emoji across the screen for stronger visual feedback.
