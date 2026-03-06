@@ -1,0 +1,510 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>LoveLink</title>
+    <style>
+      :root {
+        --bg: #fff4fa;
+        --bg-soft: #fff9fc;
+        --surface: rgba(255, 255, 255, 0.78);
+        --surface-strong: #ffffff;
+        --line: #ffd2e7;
+        --line-strong: #ffb7da;
+        --pink: #ff5fa2;
+        --rose: #ff2f7d;
+        --accent: #8e63ff;
+        --text: #3a1c2d;
+        --muted: #8b6076;
+        --shadow: 0 16px 34px rgba(255, 47, 125, 0.18);
+        --shadow-soft: 0 8px 22px rgba(255, 95, 162, 0.15);
+      }
+
+      * { box-sizing: border-box; }
+
+      body {
+        margin: 0;
+        font-family: Inter, ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
+        color: var(--text);
+        background:
+          radial-gradient(circle at 10% 0%, color-mix(in oklab, var(--pink) 20%, white) 0%, transparent 42%),
+          radial-gradient(circle at 90% 100%, color-mix(in oklab, var(--accent) 22%, white) 0%, transparent 44%),
+          linear-gradient(160deg, var(--bg) 0%, var(--bg-soft) 100%);
+      }
+
+      .topbar {
+        position: sticky;
+        top: 0;
+        z-index: 10;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        padding: 12px 14px;
+        backdrop-filter: blur(10px);
+        background: linear-gradient(130deg, color-mix(in oklab, var(--pink) 88%, white), color-mix(in oklab, var(--rose) 92%, white));
+        color: #fff;
+        box-shadow: 0 10px 24px rgba(255, 47, 125, 0.25);
+      }
+
+      .brand { margin: 0; font-size: 1.25rem; letter-spacing: 0.2px; }
+      .status { font-size: 0.8rem; font-weight: 700; text-align: right; }
+
+      .card {
+        background:
+          linear-gradient(180deg, color-mix(in oklab, var(--surface-strong) 90%, var(--pink)) 0%, var(--surface) 100%);
+        border: 1px solid var(--line);
+        border-radius: 18px;
+        box-shadow: var(--shadow);
+        backdrop-filter: blur(8px);
+      }
+
+      .login-wrap { padding: 14px; }
+      .login-card {
+        max-width: 480px;
+        margin: 14px auto;
+        padding: 18px;
+      }
+
+      h2, h3 { margin: 0 0 10px; }
+
+      .field {
+        width: 100%;
+        border-radius: 13px;
+        border: 1px solid #e7b0cb;
+        padding: 11px 12px;
+        margin-bottom: 10px;
+        font-size: 0.95rem;
+        background: #fff;
+        color: var(--text);
+      }
+
+      .btn {
+        border: 0;
+        border-radius: 13px;
+        padding: 10px 14px;
+        font-weight: 700;
+        cursor: pointer;
+        transition: transform 0.12s ease, opacity 0.2s ease;
+      }
+
+      .btn:hover { transform: translateY(-1px); }
+      .btn:active { transform: translateY(1px); }
+
+      .btn-primary {
+        background: linear-gradient(120deg, var(--pink), var(--rose));
+        color: #fff;
+        box-shadow: var(--shadow-soft);
+      }
+
+      .btn-secondary {
+        background: linear-gradient(120deg, #ffe8f3, #ffe1f7);
+        color: #612743;
+        border: 1px solid #ffc2df;
+      }
+
+      .btn-danger {
+        background: linear-gradient(120deg, #ff6c83, #ff4773);
+        color: #fff;
+      }
+
+      .error { min-height: 1.2em; color: #b1004e; margin: 0; font-weight: 600; }
+      .hidden { display: none !important; }
+
+      /* Mobile first */
+      .app {
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 12px;
+        padding: 12px;
+      }
+
+      .interaction { order: 1; padding: 14px; }
+      .presence { order: 2; padding: 14px; }
+
+      .video-wrap {
+        border-radius: 16px;
+        overflow: hidden;
+        border: 1px solid var(--line-strong);
+        box-shadow: inset 0 0 0 1px rgba(255,255,255,0.5), var(--shadow-soft);
+        background: #1a0915;
+      }
+
+      video {
+        width: 100%;
+        display: block;
+        aspect-ratio: 16 / 9;
+        object-fit: cover;
+        background: #10050c;
+      }
+
+      .controls, .quick-actions {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 8px;
+        margin-top: 10px;
+      }
+
+      .mood-row {
+        display: flex;
+        gap: 8px;
+        margin-top: 10px;
+      }
+      .mood-row select { flex: 1; }
+
+      .eq-wrap {
+        margin-top: 10px;
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 8px;
+      }
+
+      .eq-label { font-size: 0.8rem; color: var(--muted); font-weight: 700; }
+
+      canvas.equalizer {
+        width: 100%;
+        height: 80px;
+        border-radius: 12px;
+        border: 1px solid color-mix(in oklab, var(--line-strong) 90%, white);
+        background: linear-gradient(180deg, #fff, #ffe9f4);
+      }
+
+      .typing {
+        font-size: 0.82rem;
+        color: var(--muted);
+        min-height: 1.2em;
+      }
+
+      .chat-log {
+        margin-top: 8px;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        max-height: 280px;
+        overflow: auto;
+        padding: 8px;
+        border-radius: 14px;
+        border: 1px solid var(--line);
+        background: linear-gradient(180deg, #fff 0%, #fff7fb 100%);
+      }
+
+      .chat-item {
+        max-width: 92%;
+        padding: 8px 11px;
+        border-radius: 13px;
+        border: 1px solid #f4c9dc;
+        font-size: 0.88rem;
+        line-height: 1.35;
+        box-shadow: 0 3px 9px rgba(0, 0, 0, 0.04);
+      }
+
+      .chat-item.viewer {
+        align-self: flex-start;
+        background: linear-gradient(120deg, #fff1f7, #ffe4f0);
+        border-radius: 13px 13px 13px 5px;
+      }
+
+      .chat-item.host {
+        align-self: flex-end;
+        margin-left: auto;
+        background: linear-gradient(120deg, #eff4ff, #e6ebff);
+        border-color: #cad4ff;
+        color: #2f2c52;
+        border-radius: 13px 13px 5px 13px;
+      }
+
+      .chat-item.system {
+        align-self: center;
+        max-width: 100%;
+        background: linear-gradient(120deg, #fff8e8, #fff2d5);
+        border-color: #f8dd9f;
+        color: #654c0f;
+        font-size: 0.82rem;
+      }
+
+      .composer { display: flex; gap: 8px; margin-top: 8px; }
+      .composer input { flex: 1; margin: 0; }
+
+      .reaction-row {
+        margin-top: 8px;
+        display: grid;
+        grid-template-columns: repeat(5, minmax(0, 1fr));
+        gap: 6px;
+      }
+
+      .moments {
+        margin-top: 12px;
+        display: grid;
+        gap: 12px;
+        max-height: 420px;
+        overflow: auto;
+        padding-right: 2px;
+      }
+
+      .moment {
+        border-radius: 18px;
+        border: 1px solid color-mix(in oklab, var(--line-strong) 86%, white);
+        background: linear-gradient(160deg, #fff 0%, color-mix(in oklab, var(--pink) 10%, #fff) 100%);
+        box-shadow: 0 12px 24px rgba(255, 95, 162, 0.17);
+        padding: 10px;
+      }
+
+      .moment-head {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 8px;
+        font-size: 0.8rem;
+        color: var(--muted);
+      }
+
+      .moment-toggle {
+        padding: 6px 10px;
+        border-radius: 10px;
+        border: 1px solid #ffc6e1;
+        background: #fff;
+        font-size: 0.78rem;
+      }
+
+      .moment-body { margin-top: 8px; }
+
+      .moment-frame {
+        width: 100%;
+        aspect-ratio: 16 / 9;
+        max-height: 180px;
+        border-radius: 14px;
+        border: 2px solid color-mix(in oklab, var(--line-strong) 80%, white);
+        background:
+          linear-gradient(45deg, rgba(255, 208, 231, 0.62), rgba(255, 231, 244, 0.85)),
+          repeating-linear-gradient(45deg, #ffdff0, #ffdff0 12px, #ffe9f6 12px, #ffe9f6 24px);
+        padding: 8px;
+        display: grid;
+        place-items: center;
+      }
+
+      .moment img {
+        width: 100%;
+        height: 100%;
+        object-fit: contain;
+        border-radius: 10px;
+        background: #fff;
+        cursor: zoom-in;
+      }
+
+      .moment-meta,
+      .moment-comments {
+        margin-top: 8px;
+        font-size: 0.82rem;
+        color: #5a3248;
+      }
+
+      .moment-actions {
+        margin-top: 8px;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+      }
+
+      .memory-modal {
+        position: fixed;
+        inset: 0;
+        z-index: 50;
+        background: rgba(28, 8, 20, 0.72);
+        backdrop-filter: blur(8px);
+        display: grid;
+        place-items: center;
+        padding: 14px;
+      }
+
+      .memory-panel {
+        width: min(920px, 100%);
+        background: linear-gradient(170deg, #fff, #fff3fa);
+        border: 1px solid #ffc8e1;
+        border-radius: 18px;
+        box-shadow: 0 18px 48px rgba(0, 0, 0, 0.24);
+        padding: 12px;
+      }
+
+      .memory-panel img {
+        width: 100%;
+        max-height: min(70vh, 620px);
+        object-fit: contain;
+        border-radius: 12px;
+        background: #fff;
+        border: 1px solid #ffd3e8;
+      }
+
+      .memory-panel .row {
+        margin-top: 10px;
+        display: flex;
+        justify-content: flex-end;
+        gap: 8px;
+        flex-wrap: wrap;
+      }
+
+      .theme-fab {
+        position: fixed;
+        right: 14px;
+        bottom: 14px;
+        z-index: 45;
+        border-radius: 999px;
+        width: 52px;
+        height: 52px;
+        font-size: 1.3rem;
+        border: 1px solid #fff;
+      }
+
+      .theme-menu {
+        position: fixed;
+        right: 14px;
+        bottom: 74px;
+        z-index: 46;
+        min-width: 240px;
+        max-width: 80vw;
+        max-height: 55vh;
+        overflow: auto;
+        padding: 8px;
+        border-radius: 14px;
+        border: 1px solid #ffd2e7;
+        background: rgba(255, 255, 255, 0.96);
+        box-shadow: 0 12px 30px rgba(0, 0, 0, 0.2);
+      }
+
+      .theme-option {
+        width: 100%;
+        text-align: left;
+        margin-bottom: 6px;
+        padding: 8px 10px;
+        border-radius: 10px;
+        border: 1px solid #ffd7eb;
+        background: #fff;
+        font-size: 0.88rem;
+      }
+
+      .floating-heart {
+        position: fixed;
+        font-size: 24px;
+        animation: floatUp 2s ease-out forwards;
+        z-index: 30;
+      }
+
+      @keyframes floatUp {
+        from { transform: translateY(0) scale(1); opacity: 1; }
+        to { transform: translateY(-140px) scale(1.2); opacity: 0; }
+      }
+
+      @media (min-width: 700px) {
+        .app { grid-template-columns: 1fr 1fr; }
+        .presence { order: 1; }
+        .interaction { order: 2; }
+        .moment-frame { max-height: 210px; }
+      }
+
+      @media (min-width: 1080px) {
+        .app {
+          grid-template-columns: minmax(380px, 1.1fr) minmax(500px, 1fr);
+          gap: 16px;
+          padding: 16px;
+        }
+        .topbar { padding: 14px 18px; }
+        .brand { font-size: 1.4rem; }
+        .chat-log { max-height: 330px; }
+        .moments { max-height: 500px; }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="topbar">
+      <h1 class="brand">LoveLink</h1>
+      <div id="presence" class="status">Loading presence...</div>
+    </div>
+
+    <div id="loginCard" class="login-wrap">
+      <div class="card login-card">
+        <h2>Private Access</h2>
+        <input id="username" class="field" placeholder="Display name" value="Snooky" />
+        <input id="password" class="field" type="password" placeholder="Password" />
+        <button id="loginBtn" class="btn btn-primary" style="width:100%;">Enter LoveLink</button>
+        <p id="loginError" class="error"></p>
+      </div>
+    </div>
+
+    <main id="appRoot" class="app hidden">
+      <section class="card presence">
+        <h2>Presence</h2>
+        <p id="viewerStatus">Waiting for viewer...</p>
+
+        <div class="video-wrap">
+          <video id="localVideo" autoplay playsinline muted class="hidden"></video>
+          <video id="remoteVideo" autoplay playsinline class="hidden"></video>
+        </div>
+
+        <div class="controls">
+          <button id="hostBtn" class="btn btn-primary">I am Agenor (Host)</button>
+          <button id="viewerBtn" class="btn btn-secondary">I am Snooky (Viewer)</button>
+        </div>
+
+        <div class="quick-actions">
+          <button id="captureBtn" class="btn btn-secondary">📸 Capture Memory</button>
+          <button id="missYouBtn" class="btn btn-secondary">Send ❤️</button>
+        </div>
+
+        <div class="mood-row">
+          <select id="moodSelect" class="field" style="margin:0;">
+            <option>Miss you</option>
+            <option>Watching you</option>
+            <option>Thinking of you</option>
+            <option>Laughing at you</option>
+          </select>
+          <button id="sendMoodBtn" class="btn btn-secondary">Send Mood</button>
+        </div>
+
+        <div class="eq-wrap">
+          <div class="eq-label">Host Mic Equalizer</div>
+          <canvas id="hostEq" class="equalizer" width="600" height="120"></canvas>
+          <div class="eq-label">Viewer Audio Equalizer</div>
+          <canvas id="viewerEq" class="equalizer" width="600" height="120"></canvas>
+        </div>
+      </section>
+
+      <section class="card interaction">
+        <h3>Interaction</h3>
+        <div id="typingIndicator" class="typing"></div>
+        <div id="chatLog" class="chat-log"></div>
+
+        <div class="composer">
+          <input id="chatInput" class="field" placeholder="Say something sweet..." style="margin:0;" />
+          <button id="sendBtn" class="btn btn-primary">Send</button>
+        </div>
+
+        <div class="reaction-row">
+          <button class="btn btn-secondary reactBtn">❤️</button>
+          <button class="btn btn-secondary reactBtn">😂</button>
+          <button class="btn btn-secondary reactBtn">😍</button>
+          <button class="btn btn-secondary reactBtn">🔥</button>
+          <button class="btn btn-secondary reactBtn">😴</button>
+        </div>
+
+        <h3 style="margin-top:14px;">Memories</h3>
+        <div id="moments" class="moments"></div>
+      </section>
+    </main>
+
+    <div id="memoryModal" class="memory-modal hidden" aria-hidden="true">
+      <div class="memory-panel">
+        <img id="memoryModalImage" alt="Expanded memory" />
+        <div class="row">
+          <button id="memorySaveBtn" class="btn btn-secondary">Save</button>
+          <button id="memoryDeleteBtn" class="btn btn-danger">Delete</button>
+          <button id="memoryCloseBtn" class="btn btn-primary">Close</button>
+        </div>
+      </div>
+    </div>
+
+    <button id="themeFab" class="btn btn-primary theme-fab" title="Themes">🎨</button>
+    <div id="themeMenu" class="theme-menu hidden"></div>
+
+    <script src="/main.js"></script>
+  </body>
+</html>
