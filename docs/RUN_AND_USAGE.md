@@ -1,6 +1,6 @@
 # LoveLink Run & Usage Guide
 
-Last updated (UTC): 2026-03-06 03:00
+Last updated (UTC): 2026-03-06 03:35
 
 This guide explains exactly how to run this build and how to use every major feature.
 
@@ -175,3 +175,14 @@ Use this quick sequence each time:
 - Memories now render in framed cards at a compact size by default.
 - Tap a memory image to open the full viewer, then use **Save**, **Delete**, or **Close**.
 - Each memory card can be **collapsed/expanded** to keep the list clean.
+
+
+## 13) Mobile single-screen flow
+
+- The app is now optimized as a **single-screen mobile experience** (no page scroll).
+- Video feed stays pinned at the top.
+- On login, choose **Host** or **Viewer** before entering.
+- After login, the selected role starts immediately (no extra role button tap).
+- Swipe left/right (or tap tabs) to switch between **Feed** and **Memories**.
+- Memories are compact cards; tap image to open full viewer.
+- Full viewer includes **Save**, **Delete**, and **Close**.
