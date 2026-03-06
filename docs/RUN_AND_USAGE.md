@@ -1,6 +1,6 @@
 # LoveLink Run & Usage Guide
 
-Last updated (UTC): 2026-03-06 02:54
+Last updated (UTC): 2026-03-06 03:00
 
 This guide explains exactly how to run this build and how to use every major feature.
 
@@ -58,6 +58,7 @@ When viewer is connected, status messages update:
 ### Chat
 
 - Type in `Say something sweet...` and click **Send** (or press **Enter** in the message field).
+- Chat bubbles are visually separated for host vs viewer for easier reading.
 - Messages appear with timestamps.
 - Typing indicator appears live while the other person types.
 
@@ -165,3 +166,12 @@ Use this quick sequence each time:
 4. Host clicks **I am Agenor (Host)**.
 5. Viewer clicks **I am Snooky (Viewer)**.
 6. Validate stream, then use chat/reactions/moments.
+
+
+## 12) Themes and memory viewer
+
+- Tap the floating **🎨** button in the bottom-right to open theme choices.
+- Theme names are flavor + flag inspired presets (includes 🇺🇸 and 🇵🇭 options).
+- Memories now render in framed cards at a compact size by default.
+- Tap a memory image to open the full viewer, then use **Save**, **Delete**, or **Close**.
+- Each memory card can be **collapsed/expanded** to keep the list clean.

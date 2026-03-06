@@ -3,6 +3,7 @@ let role = null;
 let localStream = null;
 let peerConnection = null;
 let eventSource = null;
+let openedMemory = null;
 
 function createClientId() {
   if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') return crypto.randomUUID();
@@ -14,7 +15,7 @@ function createClientId() {
   return `${Date.now().toString(16)}-${Math.random().toString(16).slice(2)}`;
 }
 
-let clientId = createClientId();
+const clientId = createClientId();
 const iceConfig = { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] };
 
 const el = {
@@ -40,13 +41,43 @@ const el = {
   moodSelect: document.getElementById('moodSelect'),
   sendMoodBtn: document.getElementById('sendMoodBtn'),
   hostEq: document.getElementById('hostEq'),
-  viewerEq: document.getElementById('viewerEq')
+  viewerEq: document.getElementById('viewerEq'),
+  memoryModal: document.getElementById('memoryModal'),
+  memoryModalImage: document.getElementById('memoryModalImage'),
+  memorySaveBtn: document.getElementById('memorySaveBtn'),
+  memoryDeleteBtn: document.getElementById('memoryDeleteBtn'),
+  memoryCloseBtn: document.getElementById('memoryCloseBtn'),
+  themeFab: document.getElementById('themeFab'),
+  themeMenu: document.getElementById('themeMenu')
 };
 
 const audioVisualizers = {
   host: { raf: null, audioCtx: null },
   viewer: { raf: null, audioCtx: null }
 };
+
+const THEMES = [
+  {
+    name: '🍓 Strawberry Swirl',
+    vars: { '--pink': '#ff5fa2', '--rose': '#ff2f7d', '--accent': '#8e63ff', '--bg': '#fff4fa', '--bg-soft': '#fff9fc' }
+  },
+  {
+    name: '🥭 Mango Float 🇵🇭',
+    vars: { '--pink': '#ffb703', '--rose': '#fb8500', '--accent': '#1f4aa8', '--bg': '#fff9eb', '--bg-soft': '#fffef4' }
+  },
+  {
+    name: '🍦 Liberty Vanilla 🇺🇸',
+    vars: { '--pink': '#d7263d', '--rose': '#274690', '--accent': '#1f6feb', '--bg': '#f7f9ff', '--bg-soft': '#ffffff' }
+  },
+  {
+    name: '🍧 Ube Eclipse 🇵🇭',
+    vars: { '--pink': '#7f5af0', '--rose': '#6d28d9', '--accent': '#ec4899', '--bg': '#f5f2ff', '--bg-soft': '#faf8ff' }
+  },
+  {
+    name: '🍵 Matcha Sakura 🇯🇵',
+    vars: { '--pink': '#f472b6', '--rose': '#db2777', '--accent': '#3f9142', '--bg': '#f8fff6', '--bg-soft': '#fff9fc' }
+  }
+];
 
 async function api(path, method = 'GET', body) {
   const res = await fetch(path, {
@@ -65,17 +96,17 @@ function formatTime(ts) {
   return new Date(ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 }
 
-function appendChatItem(text) {
+function appendChatItem(text, kind = 'system', who = '') {
   const item = document.createElement('div');
-  item.className = 'chat-item';
+  item.className = `chat-item ${kind}`;
   item.textContent = text;
+  if (who) item.title = who;
   el.chatLog.appendChild(item);
   el.chatLog.scrollTop = el.chatLog.scrollHeight;
 }
 
 function setupEqualizer(canvas, stream, key) {
   if (!canvas || !stream) return;
-
   if (audioVisualizers[key].raf) cancelAnimationFrame(audioVisualizers[key].raf);
   if (audioVisualizers[key].audioCtx) audioVisualizers[key].audioCtx.close().catch(() => {});
 
@@ -108,15 +139,58 @@ function setupEqualizer(canvas, stream, key) {
     for (let i = 0; i < bars; i += 1) {
       const magnitude = data[i] / 255;
       const barHeight = Math.max(3, magnitude * (height - 10));
-      const x = i * barWidth + 1;
-      const y = height - barHeight;
-      ctx.fillRect(x, y, Math.max(2, barWidth - 2), barHeight);
+      ctx.fillRect(i * barWidth + 1, height - barHeight, Math.max(2, barWidth - 2), barHeight);
     }
 
     audioVisualizers[key].raf = requestAnimationFrame(draw);
   };
 
   draw();
+}
+
+function applyTheme(vars) {
+  Object.entries(vars).forEach(([k, v]) => document.documentElement.style.setProperty(k, v));
+}
+
+function renderThemes() {
+  el.themeMenu.innerHTML = '';
+  THEMES.forEach((theme) => {
+    const btn = document.createElement('button');
+    btn.className = 'theme-option';
+    btn.textContent = theme.name;
+    btn.onclick = () => {
+      applyTheme(theme.vars);
+      el.themeMenu.classList.add('hidden');
+    };
+    el.themeMenu.appendChild(btn);
+  });
+}
+
+function openMemoryModal(moment) {
+  openedMemory = moment;
+  el.memoryModalImage.src = moment.imageData;
+  el.memoryModal.classList.remove('hidden');
+}
+
+function closeMemoryModal() {
+  openedMemory = null;
+  el.memoryModal.classList.add('hidden');
+  el.memoryModalImage.removeAttribute('src');
+}
+
+function saveOpenedMemory() {
+  if (!openedMemory) return;
+  const link = document.createElement('a');
+  link.href = openedMemory.imageData;
+  link.download = `lovelink-memory-${openedMemory.id}.jpg`;
+  link.click();
+}
+
+async function deleteOpenedMemory() {
+  if (!openedMemory) return;
+  await api(`/api/moments/${openedMemory.id}`, 'DELETE');
+  closeMemoryModal();
+  await loadMoments();
 }
 
 async function checkSession() {
@@ -144,11 +218,12 @@ function connectEvents() {
 
   on('viewer-status', ({ message }) => {
     el.viewerStatus.textContent = message;
-    appendChatItem(message);
+    appendChatItem(message, 'system');
   });
 
   on('chat-message', ({ text, username: who, timestamp }) => {
-    appendChatItem(`[${formatTime(timestamp)}] ${who}: ${text}`);
+    const kind = who === username ? 'host' : 'viewer';
+    appendChatItem(`[${formatTime(timestamp)}] ${who}: ${text}`, kind, who);
   });
 
   on('typing', ({ username: who, clientId: from }) => {
@@ -160,11 +235,12 @@ function connectEvents() {
   });
 
   on('reaction', ({ emoji, username: who }) => {
-    appendChatItem(`${who} reacted ${emoji}`);
+    const kind = who === username ? 'host' : 'viewer';
+    appendChatItem(`${who} reacted ${emoji}`, kind, who);
   });
 
   on('miss-you', ({ message }) => {
-    appendChatItem(message);
+    appendChatItem(message, 'system');
     const heart = document.createElement('div');
     heart.className = 'floating-heart';
     heart.textContent = '❤️';
@@ -175,11 +251,12 @@ function connectEvents() {
   });
 
   on('mood', ({ value, username: who }) => {
-    appendChatItem(`${who}: ${value}`);
+    const kind = who === username ? 'host' : 'viewer';
+    appendChatItem(`${who}: ${value}`, kind, who);
   });
 
   on('moment-captured', () => {
-    appendChatItem('A new memory was captured 📸');
+    appendChatItem('A new memory was captured 📸', 'system');
     loadMoments();
   });
 
@@ -242,12 +319,10 @@ function setupPeerConnection() {
 el.hostBtn.onclick = async () => {
   role = 'host';
   await sendEvent('set-role', { role, clientId });
-
   localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
   el.localVideo.srcObject = localStream;
   el.localVideo.classList.remove('hidden');
   el.remoteVideo.classList.add('hidden');
-
   setupEqualizer(el.hostEq, localStream, 'host');
   el.viewerStatus.textContent = 'Host is live. Waiting for Snooky...';
 };
@@ -263,8 +338,8 @@ el.captureBtn.onclick = async () => {
   const sourceVideo = role === 'host' ? el.localVideo : el.remoteVideo;
   if (!sourceVideo.srcObject) return;
 
-  const maxWidth = 960;
-  const maxHeight = 540;
+  const maxWidth = 760;
+  const maxHeight = 428;
   const ratio = Math.min(maxWidth / (sourceVideo.videoWidth || 640), maxHeight / (sourceVideo.videoHeight || 360), 1);
 
   const canvas = document.createElement('canvas');
@@ -272,7 +347,10 @@ el.captureBtn.onclick = async () => {
   canvas.height = Math.floor((sourceVideo.videoHeight || 360) * ratio);
   canvas.getContext('2d').drawImage(sourceVideo, 0, 0, canvas.width, canvas.height);
 
-  await api('/api/moments', 'POST', { imageData: canvas.toDataURL('image/jpeg', 0.78), capturedBy: username });
+  await api('/api/moments', 'POST', {
+    imageData: canvas.toDataURL('image/jpeg', 0.76),
+    capturedBy: username
+  });
   await loadMoments();
 };
 
@@ -294,27 +372,26 @@ function renderReactionSummary(reactions) {
   return entries.map(([emoji, count]) => `${emoji} ${count}`).join(' · ');
 }
 
-async function loadMoments() {
-  const { moments } = await api('/api/moments');
-  el.moments.innerHTML = '';
+function createMomentCard(moment) {
+  const card = document.createElement('div');
+  card.className = 'moment';
 
-  moments.forEach((moment) => {
-    const card = document.createElement('div');
-    card.className = 'moment';
+  const bodyId = `moment-body-${moment.id}`;
 
-    const comments = (moment.comments || [])
-      .map((comment) => `<div><b>${comment.author}</b>: ${comment.text}</div>`)
-      .join('');
+  const comments = (moment.comments || [])
+    .map((comment) => `<div><b>${comment.author}</b>: ${comment.text}</div>`)
+    .join('');
 
-    card.innerHTML = `
-      <div class="moment-head">
-        <span>${new Date(moment.timestamp).toLocaleString()}</span>
-        <span>${moment.capturedBy}</span>
-      </div>
+  card.innerHTML = `
+    <div class="moment-head">
+      <span>${new Date(moment.timestamp).toLocaleString()} · ${moment.capturedBy}</span>
+      <button class="moment-toggle" data-toggle="${bodyId}">Collapse</button>
+    </div>
+    <div class="moment-body" id="${bodyId}">
       <div class="moment-frame">
-        <img src="${moment.imageData}" alt="Captured memory" loading="lazy" />
+        <img src="${moment.imageData}" alt="Captured memory" loading="lazy" data-open-memory="${moment.id}" />
       </div>
-      <div class="moment-comments">${renderReactionSummary(moment.reactions)}</div>
+      <div class="moment-meta">${renderReactionSummary(moment.reactions)}</div>
       <div class="moment-actions">
         <button class="btn btn-secondary" data-react="❤️">❤️</button>
         <button class="btn btn-secondary" data-react="😂">😂</button>
@@ -324,15 +401,31 @@ async function loadMoments() {
         <button class="btn btn-secondary" data-comment="1">Comment</button>
       </div>
       <div class="moment-comments">${comments || ''}</div>
-    `;
+    </div>
+  `;
 
-    card.querySelectorAll('[data-react]').forEach((btn) => {
-      btn.onclick = () => reactToMoment(moment.id, btn.dataset.react);
-    });
-    card.querySelector('[data-comment]').onclick = () => commentOnMoment(moment.id);
-
-    el.moments.appendChild(card);
+  card.querySelectorAll('[data-react]').forEach((btn) => {
+    btn.onclick = () => reactToMoment(moment.id, btn.dataset.react);
   });
+
+  card.querySelector('[data-comment]').onclick = () => commentOnMoment(moment.id);
+
+  const toggle = card.querySelector('[data-toggle]');
+  const body = card.querySelector(`#${bodyId}`);
+  toggle.onclick = () => {
+    const collapsed = body.classList.toggle('hidden');
+    toggle.textContent = collapsed ? 'Expand' : 'Collapse';
+  };
+
+  card.querySelector('[data-open-memory]').onclick = () => openMemoryModal(moment);
+
+  return card;
+}
+
+async function loadMoments() {
+  const { moments } = await api('/api/moments');
+  el.moments.innerHTML = '';
+  moments.forEach((moment) => el.moments.appendChild(createMomentCard(moment)));
 }
 
 async function handleSendMessage() {
@@ -370,4 +463,21 @@ document.querySelectorAll('.reactBtn').forEach((btn) => {
 el.missYouBtn.onclick = () => sendEvent('miss-you', { username });
 el.sendMoodBtn.onclick = () => sendEvent('mood', { value: el.moodSelect.value, username });
 
+el.memoryCloseBtn.onclick = closeMemoryModal;
+el.memorySaveBtn.onclick = saveOpenedMemory;
+el.memoryDeleteBtn.onclick = deleteOpenedMemory;
+el.memoryModal.onclick = (event) => {
+  if (event.target === el.memoryModal) closeMemoryModal();
+};
+
+el.themeFab.onclick = () => {
+  el.themeMenu.classList.toggle('hidden');
+};
+
+document.addEventListener('click', (event) => {
+  if (event.target === el.themeFab || el.themeFab.contains(event.target) || el.themeMenu.contains(event.target)) return;
+  el.themeMenu.classList.add('hidden');
+});
+
+renderThemes();
 checkSession();

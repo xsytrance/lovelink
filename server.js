@@ -192,6 +192,17 @@ const server = http.createServer(async (req, res) => {
     return json(res, 200, { ok: true, moment });
   }
 
+
+  if (pathname.match(/^\/api\/moments\/[^/]+$/) && req.method === 'DELETE') {
+    const id = pathname.split('/')[3];
+    const db = getDb();
+    const before = db.moments.length;
+    db.moments = db.moments.filter((m) => m.id !== id);
+    if (db.moments.length === before) return json(res, 404, { error: 'Moment not found' });
+    await saveDb(db);
+    return json(res, 200, { ok: true });
+  }
+
   if (pathname.match(/^\/api\/moments\/[^/]+\/reaction$/) && req.method === 'POST') {
     const id = pathname.split('/')[3];
     const body = await parseBody(req).catch(() => null);
