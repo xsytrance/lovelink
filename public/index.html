@@ -177,6 +177,26 @@
         gap: 6px;
       }
 
+      .viewer-list {
+        display: grid;
+        gap: 6px;
+      }
+
+      .viewer-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        border: 1px solid #f0cfe0;
+        border-radius: 10px;
+        padding: 6px 8px;
+        font-size: 0.78rem;
+      }
+
+      .viewer-row .btn {
+        padding: 4px 8px;
+        font-size: 0.7rem;
+      }
+
       .mem-grid {
         display: grid;
         grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -303,6 +323,10 @@
               <input id="chatInput" class="field" placeholder="Say something sweet..." />
               <button id="sendBtn" class="btn btn-primary">Send</button>
             </div>
+            <div class="composer">
+              <button id="clearChatBtn" class="btn btn-soft" style="width:100%;">Clear chat</button>
+            </div>
+            <div id="viewerList" class="viewer-list hidden"></div>
             <div class="quick-reactions">
               <button class="btn btn-soft reactBtn">❤️</button>
               <button class="btn btn-soft reactBtn">😂</button>

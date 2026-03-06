@@ -1,10 +1,12 @@
 let username = 'Snooky';
 let role = null;
 let localStream = null;
-let peerConnection = null;
+let viewerPeerConnection = null;
+let hostPeerConnections = new Map();
 let eventSource = null;
 let openedMemory = null;
 let activeTab = 0;
+let reconnectTimer = null;
 
 function createClientId() {
   if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') return crypto.randomUUID();
@@ -35,8 +37,10 @@ const el = {
   chatLog: document.getElementById('chatLog'),
   chatInput: document.getElementById('chatInput'),
   sendBtn: document.getElementById('sendBtn'),
+  clearChatBtn: document.getElementById('clearChatBtn'),
   typingIndicator: document.getElementById('typingIndicator'),
   missYouBtn: document.getElementById('missYouBtn'),
+  viewerList: document.getElementById('viewerList'),
   memoryModal: document.getElementById('memoryModal'),
   memoryModalImage: document.getElementById('memoryModalImage'),
   memorySaveBtn: document.getElementById('memorySaveBtn'),
@@ -75,7 +79,7 @@ function appendChatItem(text, kind = 'system') {
   el.chatLog.appendChild(item);
 
   const kids = [...el.chatLog.children];
-  if (kids.length > 7) kids.slice(0, kids.length - 7).forEach((k) => k.remove());
+  if (kids.length > 50) kids.slice(0, kids.length - 50).forEach((k) => k.remove());
 }
 
 function openMemoryModal(moment) {
@@ -124,39 +128,193 @@ function onAuthenticated() {
   loadMoments();
 }
 
+function closeViewerConnection() {
+  if (!viewerPeerConnection) return;
+  try {
+    viewerPeerConnection.close();
+  } catch {
+    // noop
+  }
+  viewerPeerConnection = null;
+  el.remoteVideo.srcObject = null;
+}
+
+function closeHostConnection(targetClientId) {
+  const existing = hostPeerConnections.get(targetClientId);
+  if (!existing) return;
+  try {
+    existing.close();
+  } catch {
+    // noop
+  }
+  hostPeerConnections.delete(targetClientId);
+}
+
+function closeAllHostConnections() {
+  hostPeerConnections.forEach((pc) => {
+    try {
+      pc.close();
+    } catch {
+      // noop
+    }
+  });
+  hostPeerConnections = new Map();
+}
+
+async function ensureLocalStream() {
+  if (localStream) return;
+  localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+  el.localVideo.srcObject = localStream;
+}
+
 async function startSelectedRole() {
+  await sendEvent('set-role', { role, clientId });
   if (role === 'host') {
-    await sendEvent('set-role', { role, clientId });
-    localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
-    el.localVideo.srcObject = localStream;
+    await ensureLocalStream();
     el.localVideo.classList.remove('hidden');
     el.remoteVideo.classList.add('hidden');
   } else {
-    await sendEvent('set-role', { role, clientId });
+    closeAllHostConnections();
     el.localVideo.classList.add('hidden');
     el.remoteVideo.classList.remove('hidden');
   }
 }
 
+function createHostPeerConnection(targetClientId) {
+  closeHostConnection(targetClientId);
+  const pc = new RTCPeerConnection(iceConfig);
+  hostPeerConnections.set(targetClientId, pc);
+
+  localStream.getTracks().forEach((track) => pc.addTrack(track, localStream));
+
+  pc.onicecandidate = async (event) => {
+    if (event.candidate) {
+      await sendEvent('signal', {
+        type: 'ice',
+        candidate: event.candidate,
+        from: clientId,
+        to: targetClientId
+      });
+    }
+  };
+
+  pc.onconnectionstatechange = () => {
+    if (['failed', 'closed', 'disconnected'].includes(pc.connectionState)) {
+      closeHostConnection(targetClientId);
+    }
+  };
+
+  return pc;
+}
+
+function createViewerPeerConnection() {
+  closeViewerConnection();
+  const pc = new RTCPeerConnection(iceConfig);
+  viewerPeerConnection = pc;
+
+  pc.ontrack = (event) => {
+    const [remoteStream] = event.streams;
+    el.remoteVideo.srcObject = remoteStream;
+    el.remoteVideo.classList.remove('hidden');
+  };
+
+  pc.onicecandidate = async (event) => {
+    if (event.candidate) {
+      await sendEvent('signal', { type: 'ice', candidate: event.candidate, from: clientId });
+    }
+  };
+
+  pc.onconnectionstatechange = () => {
+    if (['failed', 'closed', 'disconnected'].includes(pc.connectionState)) {
+      closeViewerConnection();
+    }
+  };
+
+  return pc;
+}
+
+async function renegotiateWithViewer(targetClientId) {
+  if (role !== 'host') return;
+  await ensureLocalStream();
+  const pc = createHostPeerConnection(targetClientId);
+  const offer = await pc.createOffer();
+  await pc.setLocalDescription(offer);
+  await sendEvent('signal', { type: 'offer', offer, from: clientId, to: targetClientId });
+}
+
+function renderViewerList(viewers) {
+  if (!el.viewerList) return;
+  if (role !== 'host') {
+    el.viewerList.classList.add('hidden');
+    return;
+  }
+  el.viewerList.classList.remove('hidden');
+  el.viewerList.innerHTML = '';
+
+  const others = (viewers || []).filter((viewer) => viewer.clientId !== clientId);
+  if (!others.length) {
+    const empty = document.createElement('div');
+    empty.className = 'footer-line';
+    empty.textContent = 'No viewers connected';
+    el.viewerList.appendChild(empty);
+    return;
+  }
+
+  others.forEach((viewer) => {
+    const row = document.createElement('div');
+    row.className = 'viewer-row';
+    row.innerHTML = `<span>${viewer.username}</span><button class="btn btn-danger">Kick</button>`;
+    row.querySelector('button').onclick = () => sendEvent('kick-viewer', { targetClientId: viewer.clientId });
+    el.viewerList.appendChild(row);
+  });
+}
+
 function connectEvents() {
-  eventSource = new EventSource('/events');
+  if (eventSource) eventSource.close();
+  eventSource = new EventSource(`/events?clientId=${encodeURIComponent(clientId)}`);
+
   const on = (name, fn) => eventSource.addEventListener(name, (e) => fn(JSON.parse(e.data)));
 
-  on('presence', ({ hostConnected, viewerConnected, viewersOnline }) => {
-    el.presence.textContent = `H:${hostConnected ? '●' : '○'} V:${viewerConnected ? '●' : '○'} · ${viewersOnline}`;
+  on('presence', ({ hostConnected, viewerConnected, viewersOnline, activeConnections, viewers }) => {
+    el.presence.textContent = `H:${hostConnected ? '●' : '○'} V:${viewerConnected ? '●' : '○'} · viewers:${viewersOnline} · online:${activeConnections}`;
+    renderViewerList(viewers);
   });
 
+  on('session-ready', async () => {
+    if (role) await startSelectedRole();
+  });
+
+  on('host-status', ({ message }) => appendChatItem(message, 'system'));
   on('viewer-status', ({ message }) => appendChatItem(message, 'system'));
+
+  on('force-logout', async ({ reason }) => {
+    appendChatItem(reason || 'This session was replaced by a newer login.', 'system');
+    await api('/api/logout', 'POST');
+    window.location.reload();
+  });
+
+  on('viewer-kicked', ({ message }) => {
+    appendChatItem(message || 'You were removed from the stream.', 'system');
+    closeViewerConnection();
+    role = null;
+  });
 
   on('chat-message', ({ text, username: who, timestamp }) => {
     const kind = who === username ? 'host' : 'viewer';
     appendChatItem(`[${new Date(timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}] ${who}: ${text}`, kind);
   });
 
+  on('chat-cleared', ({ by, timestamp }) => {
+    el.chatLog.innerHTML = '';
+    appendChatItem(`[${new Date(timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}] ${by} cleared the chat`, 'system');
+  });
+
   on('typing', ({ username: who, clientId: from }) => {
     if (from === clientId) return;
     el.typingIndicator.textContent = `${who} is typing...`;
-    setTimeout(() => { el.typingIndicator.textContent = ''; }, 1000);
+    setTimeout(() => {
+      el.typingIndicator.textContent = '';
+    }, 1000);
   });
 
   on('reaction', ({ emoji, username: who }) => {
@@ -176,30 +334,50 @@ function connectEvents() {
   on('signal', async (data) => {
     if (data.to && data.to !== clientId) return;
 
-    if (data.type === 'viewer-ready' && role === 'host' && localStream) {
-      setupPeerConnection();
-      localStream.getTracks().forEach((track) => peerConnection.addTrack(track, localStream));
-      const offer = await peerConnection.createOffer();
-      await peerConnection.setLocalDescription(offer);
-      await sendEvent('signal', { type: 'offer', offer, from: clientId, to: data.from || data.clientId });
+    if (data.type === 'viewer-ready' && role === 'host') {
+      await renegotiateWithViewer(data.from || data.clientId);
+      return;
     }
 
     if (data.type === 'offer' && role === 'viewer') {
-      setupPeerConnection();
-      await peerConnection.setRemoteDescription(new RTCSessionDescription(data.offer));
-      const answer = await peerConnection.createAnswer();
-      await peerConnection.setLocalDescription(answer);
+      const pc = createViewerPeerConnection();
+      await pc.setRemoteDescription(new RTCSessionDescription(data.offer));
+      const answer = await pc.createAnswer();
+      await pc.setLocalDescription(answer);
       await sendEvent('signal', { type: 'answer', answer, from: clientId, to: data.from });
+      return;
     }
 
-    if (data.type === 'answer' && peerConnection) {
-      await peerConnection.setRemoteDescription(new RTCSessionDescription(data.answer));
+    if (data.type === 'answer' && role === 'host') {
+      const pc = hostPeerConnections.get(data.from);
+      if (pc) await pc.setRemoteDescription(new RTCSessionDescription(data.answer));
+      return;
     }
 
-    if (data.type === 'ice' && peerConnection && data.candidate) {
-      await peerConnection.addIceCandidate(new RTCIceCandidate(data.candidate));
+    if (data.type === 'ice') {
+      if (role === 'host') {
+        const pc = hostPeerConnections.get(data.from);
+        if (pc && data.candidate) await pc.addIceCandidate(new RTCIceCandidate(data.candidate));
+      }
+      if (role === 'viewer' && viewerPeerConnection && data.candidate) {
+        await viewerPeerConnection.addIceCandidate(new RTCIceCandidate(data.candidate));
+      }
+      return;
+    }
+
+    if (data.type === 'viewer-kicked' && role === 'viewer') {
+      closeViewerConnection();
+      role = null;
     }
   });
+
+  eventSource.onerror = () => {
+    if (reconnectTimer) return;
+    reconnectTimer = setTimeout(() => {
+      reconnectTimer = null;
+      connectEvents();
+    }, 1500);
+  };
 }
 
 async function handleLogin() {
@@ -212,20 +390,6 @@ async function handleLogin() {
   } catch (err) {
     el.loginError.textContent = err.message;
   }
-}
-
-function setupPeerConnection() {
-  peerConnection = new RTCPeerConnection(iceConfig);
-  peerConnection.ontrack = (event) => {
-    const [remoteStream] = event.streams;
-    el.remoteVideo.srcObject = remoteStream;
-    el.remoteVideo.classList.remove('hidden');
-  };
-  peerConnection.onicecandidate = async (event) => {
-    if (event.candidate) {
-      await sendEvent('signal', { type: 'ice', candidate: event.candidate, from: clientId });
-    }
-  };
 }
 
 el.captureBtn.onclick = async () => {
@@ -304,6 +468,7 @@ async function handleSendMessage() {
 
 el.loginBtn.onclick = handleLogin;
 el.sendBtn.onclick = handleSendMessage;
+el.clearChatBtn.onclick = () => sendEvent('clear-chat', { username });
 
 el.chatInput.onkeydown = (event) => {
   if (event.key === 'Enter') {
@@ -350,6 +515,12 @@ el.memoryDeleteBtn.onclick = deleteOpenedMemory;
 el.memoryModal.onclick = (event) => {
   if (event.target === el.memoryModal) closeMemoryModal();
 };
+
+window.addEventListener('beforeunload', () => {
+  if (eventSource) eventSource.close();
+  closeViewerConnection();
+  closeAllHostConnections();
+});
 
 setTab(0);
 checkSession();

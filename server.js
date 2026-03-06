@@ -17,7 +17,7 @@ const state = {
   clients: new Map(),
   presence: {
     hostId: null,
-    viewerId: null,
+    viewerIds: new Set(),
     online: 0,
     usernames: {}
   }
@@ -66,7 +66,9 @@ function getSession(req) {
   if (!raw) return null;
   const [sid, sig] = raw.split('.');
   if (!sid || !sig || sign(sid) !== sig) return null;
-  return state.sessions.get(sid) || null;
+  const session = state.sessions.get(sid);
+  if (!session) return null;
+  return { ...session, sid };
 }
 
 function parseBody(req) {
@@ -92,15 +94,52 @@ function parseBody(req) {
 
 function sendEvent(type, payload) {
   const msg = `event: ${type}\ndata: ${JSON.stringify(payload)}\n\n`;
-  state.clients.forEach((client) => client.res.write(msg));
+  state.clients.forEach((client, clientId) => {
+    try {
+      client.res.write(msg);
+    } catch {
+      state.clients.delete(clientId);
+    }
+  });
+}
+
+function sendEventTo(clientId, type, payload) {
+  const client = state.clients.get(clientId);
+  if (!client) return;
+  const msg = `event: ${type}\ndata: ${JSON.stringify(payload)}\n\n`;
+  try {
+    client.res.write(msg);
+  } catch {
+    state.clients.delete(clientId);
+  }
 }
 
 function emitPresence() {
   sendEvent('presence', {
     hostConnected: Boolean(state.presence.hostId),
-    viewerConnected: Boolean(state.presence.viewerId),
-    viewersOnline: state.presence.online
+    viewerConnected: state.presence.viewerIds.size > 0,
+    viewersOnline: state.presence.viewerIds.size,
+    activeConnections: state.presence.online,
+    viewers: Array.from(state.presence.viewerIds).map((id) => {
+      const viewer = state.clients.get(id);
+      return {
+        clientId: id,
+        username: viewer?.username || 'Viewer'
+      };
+    })
   });
+}
+
+function removeClientRoles(clientId) {
+  if (state.presence.hostId === clientId) {
+    state.presence.hostId = null;
+    sendEvent('host-status', { message: 'Host disconnected' });
+  }
+
+  if (state.presence.viewerIds.has(clientId)) {
+    state.presence.viewerIds.delete(clientId);
+    sendEvent('viewer-status', { message: 'A viewer disconnected' });
+  }
 }
 
 function serveFile(reqPath, res) {
@@ -126,23 +165,31 @@ const server = http.createServer(async (req, res) => {
   if (pathname === '/events' && req.method === 'GET') {
     const session = getSession(req);
     if (!session?.authenticated) return json(res, 401, { error: 'Unauthorized' });
-    const id = crypto.randomBytes(8).toString('hex');
+    const id = parsed.query.clientId || crypto.randomBytes(8).toString('hex');
+    const existingClient = state.clients.get(id);
+    if (existingClient) {
+      try {
+        existingClient.res.end();
+      } catch {
+        // noop
+      }
+      removeClientRoles(id);
+      state.clients.delete(id);
+      state.presence.online = Math.max(0, state.presence.online - 1);
+    }
     res.writeHead(200, {
       'Content-Type': 'text/event-stream',
       'Cache-Control': 'no-cache',
       Connection: 'keep-alive'
     });
-    state.clients.set(id, { res, username: session.username });
+    state.clients.set(id, { res, username: session.username, sid: session.sid });
     state.presence.online += 1;
+    sendEventTo(id, 'session-ready', { clientId: id, username: session.username });
     emitPresence();
     req.on('close', () => {
       state.clients.delete(id);
       state.presence.online = Math.max(0, state.presence.online - 1);
-      if (state.presence.hostId === id) state.presence.hostId = null;
-      if (state.presence.viewerId === id) {
-        state.presence.viewerId = null;
-        sendEvent('viewer-status', { message: 'Snooky disconnected' });
-      }
+      removeClientRoles(id);
       emitPresence();
     });
     return;
@@ -153,8 +200,29 @@ const server = http.createServer(async (req, res) => {
     if (!body) return json(res, 400, { error: 'Invalid JSON' });
     if (body.password !== PASSWORD) return json(res, 401, { error: 'Invalid password' });
     const username = body.username || 'Snooky';
+
+    const replacedSids = [];
+    state.sessions.forEach((value, sid) => {
+      if (value.username === username) replacedSids.push(sid);
+    });
+    replacedSids.forEach((sid) => state.sessions.delete(sid));
+
+    state.clients.forEach((client, clientId) => {
+      if (!replacedSids.includes(client.sid)) return;
+      sendEventTo(clientId, 'force-logout', { reason: 'A newer login replaced this session.' });
+      removeClientRoles(clientId);
+      try {
+        client.res.end();
+      } catch {
+        // noop
+      }
+      state.clients.delete(clientId);
+      state.presence.online = Math.max(0, state.presence.online - 1);
+    });
+
     const sid = createSession(username);
     res.setHeader('Set-Cookie', `lovelink_session=${sid}.${sign(sid)}; HttpOnly; SameSite=Lax; Path=/`);
+    emitPresence();
     return json(res, 200, { ok: true, username });
   }
 
@@ -232,17 +300,31 @@ const server = http.createServer(async (req, res) => {
     if (!body?.type) return json(res, 400, { error: 'Event type required' });
 
     if (body.type === 'set-role') {
+      if (!body.clientId) return json(res, 400, { error: 'Client ID required' });
+      removeClientRoles(body.clientId);
       if (body.role === 'host') state.presence.hostId = body.clientId;
       if (body.role === 'viewer') {
-        state.presence.viewerId = body.clientId;
-        sendEvent('viewer-status', { message: 'Snooky is watching ❤️' });
+        state.presence.viewerIds.add(body.clientId);
+        sendEvent('viewer-status', { message: `${session.username} is watching ❤️` });
         sendEvent('signal', { from: body.clientId, type: 'viewer-ready' });
       }
       emitPresence();
     }
 
+    if (body.type === 'kick-viewer') {
+      const targetId = body.payload?.targetClientId;
+      if (!targetId) return json(res, 400, { error: 'Target viewer required' });
+      if (state.presence.hostId !== body.clientId) return json(res, 403, { error: 'Only host can kick viewers' });
+      if (!state.presence.viewerIds.has(targetId)) return json(res, 404, { error: 'Viewer not found' });
+      sendEventTo(targetId, 'viewer-kicked', { message: 'Host removed you from the stream.' });
+      sendEvent('signal', { type: 'viewer-kicked', to: targetId, from: body.clientId });
+      removeClientRoles(targetId);
+      emitPresence();
+    }
+
     if (body.type === 'signal') sendEvent('signal', body.payload);
     if (body.type === 'chat-message') sendEvent('chat-message', { ...body.payload, timestamp: Date.now() });
+    if (body.type === 'clear-chat') sendEvent('chat-cleared', { by: session.username, timestamp: Date.now() });
     if (body.type === 'typing') sendEvent('typing', body.payload);
     if (body.type === 'reaction') sendEvent('reaction', body.payload);
     if (body.type === 'miss-you') sendEvent('miss-you', { message: 'Snooky sent you a ❤️', timestamp: Date.now() });
