@@ -1,0 +1,416 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <title>LoveLink</title>
+    <style>
+      :root {
+        --primary: #ff4f98;
+        --primary-2: #7d67ff;
+        --bg: #f8f4ff;
+        --bg-2: #fff8fc;
+        --surface: rgba(255, 255, 255, 0.78);
+        --surface-strong: #ffffff;
+        --text: #2f1b2a;
+        --muted: #7f5f72;
+        --line: #f1d1e5;
+        --radius: 18px;
+        --shadow: 0 14px 30px rgba(72, 20, 55, 0.18);
+      }
+
+      * { box-sizing: border-box; }
+
+      html, body {
+        margin: 0;
+        height: 100%;
+        overflow: hidden;
+        font-family: Inter, Roboto, system-ui, -apple-system, Segoe UI, Arial, sans-serif;
+        color: var(--text);
+        background:
+          radial-gradient(circle at 10% -20%, color-mix(in oklab, var(--primary) 20%, white), transparent 48%),
+          radial-gradient(circle at 100% 120%, color-mix(in oklab, var(--primary-2) 24%, white), transparent 38%),
+          linear-gradient(180deg, var(--bg) 0%, var(--bg-2) 100%);
+      }
+
+      .hidden { display: none !important; }
+
+      .topbar {
+        height: 56px;
+        padding: 0 12px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        color: white;
+        background: linear-gradient(120deg, var(--primary), var(--primary-2));
+        box-shadow: 0 10px 24px rgba(64, 21, 52, 0.26);
+      }
+
+      .brand {
+        font-weight: 800;
+        letter-spacing: 0.25px;
+      }
+
+      .status { font-size: 0.72rem; max-width: 62%; text-align: right; }
+
+      .login-screen {
+        height: calc(100vh - 56px);
+        display: grid;
+        place-items: center;
+        padding: 14px;
+      }
+
+      .login-card {
+        width: min(460px, 100%);
+        padding: 16px;
+        border-radius: 22px;
+        border: 1px solid var(--line);
+        background: var(--surface);
+        backdrop-filter: blur(12px);
+        box-shadow: var(--shadow);
+      }
+
+      .field {
+        width: 100%;
+        margin-bottom: 10px;
+        padding: 11px;
+        border-radius: 13px;
+        border: 1px solid #e8bfd6;
+        background: #fff;
+        color: var(--text);
+      }
+
+      .btn {
+        border: 0;
+        border-radius: 13px;
+        padding: 10px 12px;
+        font-weight: 700;
+      }
+
+      .btn-primary {
+        color: white;
+        background: linear-gradient(120deg, var(--primary), color-mix(in oklab, var(--primary-2) 70%, var(--primary)));
+      }
+
+      .btn-soft {
+        color: #5b2b44;
+        border: 1px solid #f3cade;
+        background: linear-gradient(120deg, #fff, #ffeef7);
+      }
+
+      .btn-danger {
+        color: white;
+        background: linear-gradient(120deg, #ff657f, #ff3d67);
+      }
+
+      .app {
+        height: calc(100vh - 56px);
+        display: grid;
+        grid-template-rows: auto auto auto 1fr;
+        gap: 8px;
+        padding: 8px;
+      }
+
+      .panel {
+        border-radius: var(--radius);
+        border: 1px solid var(--line);
+        background: var(--surface);
+        backdrop-filter: blur(8px);
+        box-shadow: var(--shadow);
+      }
+
+      .video-wrap {
+        overflow: hidden;
+        background: #150d16;
+      }
+
+      video {
+        width: 100%;
+        display: block;
+        aspect-ratio: 16 / 9;
+        object-fit: cover;
+      }
+
+      .controls {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 8px;
+        padding: 8px;
+      }
+
+      .tabs {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 8px;
+      }
+
+      .tab-btn.active {
+        background: linear-gradient(120deg, var(--primary), var(--primary-2));
+        color: #fff;
+      }
+
+      .swipe-shell {
+        overflow: hidden;
+      }
+
+      .swipe-track {
+        width: 200%;
+        height: 100%;
+        display: flex;
+        transition: transform 220ms ease;
+      }
+
+      .pane {
+        width: 50%;
+        height: 100%;
+        padding: 8px;
+        display: grid;
+        align-content: start;
+        gap: 8px;
+      }
+
+      .typing {
+        font-size: 0.74rem;
+        color: var(--muted);
+        min-height: 1.1rem;
+      }
+
+      .chat-log {
+        display: grid;
+        gap: 6px;
+      }
+
+      .chat-item {
+        font-size: 0.8rem;
+        padding: 7px 9px;
+        border-radius: 12px;
+        border: 1px solid #ebcbdd;
+      }
+      .chat-item.viewer { background: #fff0f7; }
+      .chat-item.host { background: #ebf0ff; border-color: #cdd8ff; margin-left: 26px; }
+      .chat-item.system { background: #fff7e7; border-color: #f5ddb1; text-align: center; }
+
+      .composer { display: flex; gap: 8px; }
+      .composer input { margin: 0; flex: 1; }
+
+      .reaction-row {
+        display: grid;
+        grid-template-columns: repeat(5, minmax(0, 1fr));
+        gap: 6px;
+      }
+
+      .emoji-tools {
+        display: grid;
+        grid-template-columns: 1fr auto;
+        gap: 6px;
+      }
+
+      .sticker-row {
+        display: grid;
+        grid-template-columns: repeat(5, minmax(0, 1fr));
+        gap: 6px;
+      }
+
+      .mem-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 8px;
+      }
+
+      .memory-card {
+        padding: 7px;
+        border-radius: 14px;
+        border: 1px solid #f3cade;
+        background: linear-gradient(145deg, #fff, #fff1f8);
+        box-shadow: 0 10px 20px rgba(255, 95, 162, 0.14);
+      }
+
+      .memory-thumb {
+        border-radius: 9px;
+        border: 1px solid #f2c6dd;
+        overflow: hidden;
+        aspect-ratio: 16 / 9;
+        background: repeating-linear-gradient(45deg, #ffe4f2, #ffe4f2 10px, #ffd9ea 10px, #ffd9ea 20px);
+      }
+
+      .memory-thumb img {
+        width: 100%;
+        height: 100%;
+        object-fit: contain;
+        background: #fff;
+        cursor: zoom-in;
+      }
+
+      .memory-meta {
+        margin-top: 6px;
+        color: var(--muted);
+        font-size: 0.68rem;
+      }
+
+      .memory-actions {
+        margin-top: 6px;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+      }
+
+      .memory-actions .btn { font-size: 0.7rem; padding: 4px 7px; }
+
+      .memory-modal {
+        position: fixed;
+        inset: 0;
+        z-index: 40;
+        background: rgba(19, 8, 16, 0.78);
+        display: grid;
+        place-items: center;
+        padding: 12px;
+      }
+
+      .memory-panel {
+        width: min(920px, 100%);
+        border-radius: 16px;
+        padding: 10px;
+        border: 1px solid #f1c8df;
+        background: #fff;
+        box-shadow: 0 22px 40px rgba(0, 0, 0, 0.34);
+      }
+
+      .memory-panel img {
+        width: 100%;
+        max-height: 70vh;
+        object-fit: contain;
+        border-radius: 10px;
+        border: 1px solid #f3cfe2;
+        background: #fff;
+      }
+
+      .memory-panel .row {
+        margin-top: 8px;
+        display: flex;
+        justify-content: flex-end;
+        gap: 8px;
+      }
+
+      .customize-btn {
+        position: fixed;
+        right: 10px;
+        bottom: 10px;
+        z-index: 30;
+        width: 52px;
+        height: 52px;
+        border-radius: 999px;
+      }
+
+      .customize-panel {
+        position: fixed;
+        z-index: 31;
+        right: 10px;
+        bottom: 70px;
+        width: min(310px, 86vw);
+        padding: 10px;
+        border-radius: 14px;
+        border: 1px solid #efcae0;
+        background: rgba(255,255,255,0.96);
+        box-shadow: 0 14px 30px rgba(0,0,0,0.2);
+      }
+
+      .customize-panel .field { margin-bottom: 6px; }
+
+      @media (min-width: 900px) {
+        .app { max-width: 720px; margin: 0 auto; }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="topbar">
+      <div class="brand">LoveLink</div>
+      <div id="presence" class="status">Loading...</div>
+    </div>
+
+    <section id="loginCard" class="login-screen">
+      <div class="login-card">
+        <h2 style="margin:0 0 10px;">Private Access</h2>
+        <input id="username" class="field" placeholder="Display name" value="Snooky" />
+        <input id="password" class="field" type="password" placeholder="Password" />
+        <select id="roleSelect" class="field">
+          <option value="viewer">Log in as Viewer</option>
+          <option value="host">Log in as Host</option>
+        </select>
+        <button id="loginBtn" class="btn btn-primary" style="width:100%;">Enter LoveLink</button>
+        <p id="loginError" style="color:#b1004e;min-height:1.1rem;"></p>
+      </div>
+    </section>
+
+    <main id="appRoot" class="app hidden">
+      <div class="video-wrap panel">
+        <video id="localVideo" autoplay playsinline muted class="hidden"></video>
+        <video id="remoteVideo" autoplay playsinline class="hidden"></video>
+      </div>
+
+      <div class="controls panel">
+        <button id="captureBtn" class="btn btn-soft">📸 Memory</button>
+        <button id="missYouBtn" class="btn btn-soft">Send ❤️</button>
+        <button id="pipBtn" class="btn btn-soft">PiP</button>
+      </div>
+
+      <div class="tabs">
+        <button id="feedTabBtn" class="btn btn-soft tab-btn active">Feed</button>
+        <button id="memoriesTabBtn" class="btn btn-soft tab-btn">Memories</button>
+      </div>
+
+      <div id="swipeShell" class="swipe-shell panel">
+        <div id="swipeTrack" class="swipe-track">
+          <section class="pane">
+            <div id="typingIndicator" class="typing"></div>
+            <div id="chatLog" class="chat-log"></div>
+            <div class="composer">
+              <input id="chatInput" class="field" placeholder="Say something sweet..." />
+              <button id="sendBtn" class="btn btn-primary">Send</button>
+            </div>
+            <div class="reaction-row">
+              <button class="btn btn-soft reactBtn">❤️</button>
+              <button class="btn btn-soft reactBtn">😂</button>
+              <button class="btn btn-soft reactBtn">😍</button>
+              <button class="btn btn-soft reactBtn">🔥</button>
+              <button class="btn btn-soft reactBtn">😴</button>
+            </div>
+            <div class="emoji-tools">
+              <input id="customReactionInput" class="field" placeholder="Any emoji 😀🎉🌈" />
+              <button id="customReactionBtn" class="btn btn-soft">Add</button>
+            </div>
+            <div class="sticker-row" id="stickerRow"></div>
+          </section>
+
+          <section class="pane">
+            <div style="font-size:.75rem;color:var(--muted);">Memories (latest 6)</div>
+            <div id="moments" class="mem-grid"></div>
+          </section>
+        </div>
+      </div>
+    </main>
+
+    <div id="memoryModal" class="memory-modal hidden">
+      <div class="memory-panel">
+        <img id="memoryModalImage" alt="memory" />
+        <div class="row">
+          <button id="memorySaveBtn" class="btn btn-soft">Save</button>
+          <button id="memoryDeleteBtn" class="btn btn-danger">Delete</button>
+          <button id="memoryCloseBtn" class="btn btn-primary">Close</button>
+        </div>
+      </div>
+    </div>
+
+    <button id="customizeBtn" class="btn btn-primary customize-btn">🎨</button>
+    <div id="customizePanel" class="customize-panel hidden">
+      <select id="themeSelect" class="field"></select>
+      <label style="display:flex;gap:8px;align-items:center;font-size:.85rem;color:var(--muted);">
+        <input id="compactToggle" type="checkbox" /> Compact chat bubbles
+      </label>
+      <label style="display:flex;gap:8px;align-items:center;font-size:.85rem;color:var(--muted);margin-top:4px;">
+        <input id="glassToggle" type="checkbox" checked /> Glassmorphism cards
+      </label>
+    </div>
+
+    <script src="/main.js"></script>
+  </body>
+</html>
