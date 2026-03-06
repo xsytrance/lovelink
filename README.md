@@ -1,5 +1,7 @@
 # LoveLink
 
+Last updated (UTC): 2026-03-06 02:54
+
 LoveLink is a private, always-on live presence portal for Agenor and Snooky.
 
 This repository now includes a complete **run + usage guide** so you can start the app, log in, stream, and use moments/chat features quickly.
@@ -27,6 +29,7 @@ npm start
 
 3. Open `http://localhost:3000`.
 4. Log in with password `lovelink` (unless overridden by env var).
+5. Press **Enter** in login/message text fields if you prefer keyboard-only flow (login and chat send).
 
 For full operational steps, role setup, and troubleshooting, see:
 

@@ -1,5 +1,7 @@
 # LoveLink Run & Usage Guide
 
+Last updated (UTC): 2026-03-06 02:54
+
 This guide explains exactly how to run this build and how to use every major feature.
 
 ## 1) Requirements
@@ -32,7 +34,7 @@ On the login card:
 
 - **Display name**: choose your name (defaults to `Snooky`).
 - **Password**: default is `lovelink`.
-- Click **Enter LoveLink**.
+- Click **Enter LoveLink** (or press **Enter** in the display name/password field).
 
 If you changed the password, use your `LOVE_LINK_PASSWORD` value.
 
@@ -55,7 +57,7 @@ When viewer is connected, status messages update:
 
 ### Chat
 
-- Type in `Say something sweet...` and click **Send**.
+- Type in `Say something sweet...` and click **Send** (or press **Enter** in the message field).
 - Messages appear with timestamps.
 - Typing indicator appears live while the other person types.
 
