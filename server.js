@@ -12,14 +12,23 @@ const SESSION_SECRET = process.env.SESSION_SECRET || 'lovelink-secret';
 const PUBLIC_DIR = path.join(__dirname, 'public');
 const DB_FILE = path.join(__dirname, 'lovelink.json');
 
+const ALLOWED_IDENTITIES = [
+  'Snooky 📱',
+  'Snooky 💻',
+  'Snooky 🟦',
+  'Agenor',
+  'Agenor 🟦',
+  'Agenor 📱'
+];
+
 const state = {
   sessions: new Map(),
   clients: new Map(),
+  activeIdentities: new Set(),
   presence: {
     hostId: null,
     viewerId: null,
-    online: 0,
-    usernames: {}
+    online: 0
   }
 };
 
@@ -57,7 +66,14 @@ function sign(value) {
 function createSession(username) {
   const sid = crypto.randomBytes(18).toString('hex');
   state.sessions.set(sid, { username, authenticated: true, createdAt: Date.now() });
+  state.activeIdentities.add(username);
   return sid;
+}
+
+function destroySessionBySid(sid) {
+  const session = state.sessions.get(sid);
+  if (session?.username) state.activeIdentities.delete(session.username);
+  state.sessions.delete(sid);
 }
 
 function getSession(req) {
@@ -99,12 +115,13 @@ function emitPresence() {
   sendEvent('presence', {
     hostConnected: Boolean(state.presence.hostId),
     viewerConnected: Boolean(state.presence.viewerId),
-    viewersOnline: state.presence.online
+    viewersOnline: state.presence.online,
+    activeIdentities: [...state.activeIdentities].sort()
   });
 }
 
 function serveFile(reqPath, res) {
-  let p = reqPath === '/' ? '/index.html' : reqPath;
+  const p = reqPath === '/' ? '/index.html' : reqPath;
   const filePath = path.normalize(path.join(PUBLIC_DIR, p));
   if (!filePath.startsWith(PUBLIC_DIR)) return json(res, 403, { error: 'Forbidden' });
   if (!fs.existsSync(filePath)) return json(res, 404, { error: 'Not found' });
@@ -126,23 +143,25 @@ const server = http.createServer(async (req, res) => {
   if (pathname === '/events' && req.method === 'GET') {
     const session = getSession(req);
     if (!session?.authenticated) return json(res, 401, { error: 'Unauthorized' });
+
     const id = crypto.randomBytes(8).toString('hex');
     res.writeHead(200, {
       'Content-Type': 'text/event-stream',
       'Cache-Control': 'no-cache',
       Connection: 'keep-alive'
     });
+
     state.clients.set(id, { res, username: session.username });
     state.presence.online += 1;
+    sendEvent('toast', { text: `${session.username} connected`, type: 'connect' });
     emitPresence();
+
     req.on('close', () => {
       state.clients.delete(id);
       state.presence.online = Math.max(0, state.presence.online - 1);
       if (state.presence.hostId === id) state.presence.hostId = null;
-      if (state.presence.viewerId === id) {
-        state.presence.viewerId = null;
-        sendEvent('viewer-status', { message: 'Snooky disconnected' });
-      }
+      if (state.presence.viewerId === id) state.presence.viewerId = null;
+      sendEvent('toast', { text: `${session.username} disconnected`, type: 'disconnect' });
       emitPresence();
     });
     return;
@@ -152,16 +171,33 @@ const server = http.createServer(async (req, res) => {
     const body = await parseBody(req).catch(() => null);
     if (!body) return json(res, 400, { error: 'Invalid JSON' });
     if (body.password !== PASSWORD) return json(res, 401, { error: 'Invalid password' });
-    const username = body.username || 'Snooky';
+
+    const username = body.username || '';
+    if (!ALLOWED_IDENTITIES.includes(username)) {
+      return json(res, 400, { error: 'Identity not allowed for this build' });
+    }
+
+    if (state.activeIdentities.has(username)) {
+      return json(res, 409, { error: `${username} is already logged in` });
+    }
+
     const sid = createSession(username);
     res.setHeader('Set-Cookie', `lovelink_session=${sid}.${sign(sid)}; HttpOnly; SameSite=Lax; Path=/`);
-    return json(res, 200, { ok: true, username });
+    emitPresence();
+    return json(res, 200, { ok: true, username, allowedIdentities: ALLOWED_IDENTITIES });
   }
 
   if (pathname === '/api/session' && req.method === 'GET') {
     const session = getSession(req);
-    if (!session?.authenticated) return json(res, 200, { authenticated: false });
-    return json(res, 200, { authenticated: true, username: session.username });
+    if (!session?.authenticated) {
+      return json(res, 200, { authenticated: false, allowedIdentities: ALLOWED_IDENTITIES });
+    }
+    return json(res, 200, {
+      authenticated: true,
+      username: session.username,
+      allowedIdentities: ALLOWED_IDENTITIES,
+      activeIdentities: [...state.activeIdentities].sort()
+    });
   }
 
   const session = getSession(req);
@@ -177,6 +213,7 @@ const server = http.createServer(async (req, res) => {
   if (pathname === '/api/moments' && req.method === 'POST') {
     const body = await parseBody(req).catch(() => null);
     if (!body?.imageData?.startsWith('data:image/')) return json(res, 400, { error: 'Invalid image payload' });
+
     const db = getDb();
     const moment = {
       id: crypto.randomBytes(8).toString('hex'),
@@ -186,12 +223,12 @@ const server = http.createServer(async (req, res) => {
       reactions: {},
       comments: []
     };
+
     db.moments.push(moment);
     await saveDb(db);
     sendEvent('moment-captured', { id: moment.id, timestamp: moment.timestamp, capturedBy: moment.capturedBy });
     return json(res, 200, { ok: true, moment });
   }
-
 
   if (pathname.match(/^\/api\/moments\/[^/]+$/) && req.method === 'DELETE') {
     const id = pathname.split('/')[3];
@@ -235,7 +272,7 @@ const server = http.createServer(async (req, res) => {
       if (body.role === 'host') state.presence.hostId = body.clientId;
       if (body.role === 'viewer') {
         state.presence.viewerId = body.clientId;
-        sendEvent('viewer-status', { message: 'Snooky is watching ❤️' });
+        sendEvent('viewer-status', { message: `${session.username} is watching ❤️` });
         sendEvent('signal', { from: body.clientId, type: 'viewer-ready' });
       }
       emitPresence();
@@ -245,7 +282,7 @@ const server = http.createServer(async (req, res) => {
     if (body.type === 'chat-message') sendEvent('chat-message', { ...body.payload, timestamp: Date.now() });
     if (body.type === 'typing') sendEvent('typing', body.payload);
     if (body.type === 'reaction') sendEvent('reaction', body.payload);
-    if (body.type === 'miss-you') sendEvent('miss-you', { message: 'Snooky sent you a ❤️', timestamp: Date.now() });
+    if (body.type === 'miss-you') sendEvent('miss-you', { message: `${session.username} sent you a ${body.payload?.emoji || '❤️'}`, timestamp: Date.now() });
     if (body.type === 'mood') sendEvent('mood', body.payload);
     if (body.type === 'mood-theme') sendEvent('mood-theme', body.payload);
     if (body.type === 'voice-message') sendEvent('voice-message', body.payload);
@@ -256,9 +293,11 @@ const server = http.createServer(async (req, res) => {
   if (pathname === '/api/logout' && req.method === 'POST') {
     const cookie = parseCookies(req).lovelink_session;
     if (cookie) {
-      state.sessions.delete(cookie.split('.')[0]);
+      const sid = cookie.split('.')[0];
+      destroySessionBySid(sid);
       res.setHeader('Set-Cookie', 'lovelink_session=; HttpOnly; Path=/; Max-Age=0');
     }
+    emitPresence();
     return json(res, 200, { ok: true });
   }
 

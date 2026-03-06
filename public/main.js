@@ -75,6 +75,12 @@ const el = {
   toggleFeedBtn: document.getElementById('toggleFeedBtn'),
   toggleAudioBtn: document.getElementById('toggleAudioBtn'),
   themeQuickBtn: document.getElementById('themeQuickBtn'),
+  ytmBtn: document.getElementById('ytmBtn'),
+  previewSize: document.getElementById('previewSize'),
+  connectionBadge: document.getElementById('connectionBadge'),
+  connectionPanel: document.getElementById('connectionPanel'),
+  connectionList: document.getElementById('connectionList'),
+  toastLayer: document.getElementById('toastLayer'),
   heartEmojiInput: document.getElementById('heartEmojiInput'),
   moodSelect: document.getElementById('moodSelect'),
   moodApplyBtn: document.getElementById('moodApplyBtn'),
@@ -119,6 +125,36 @@ async function api(path, method = 'GET', body) {
 }
 
 const sendEvent = (type, payload = {}) => api('/api/event', 'POST', { type, payload, clientId, role });
+
+function showToast(text, tone = 'info') {
+  const node = document.createElement('div');
+  node.textContent = text;
+  node.style.padding = '8px 10px';
+  node.style.borderRadius = '12px';
+  node.style.fontSize = '12px';
+  node.style.color = '#fff';
+  node.style.boxShadow = '0 10px 24px rgba(0,0,0,0.24)';
+  node.style.background = tone === 'error' ? 'linear-gradient(120deg,#ff5d73,#ff3d60)' : tone === 'ok' ? 'linear-gradient(120deg,#00b894,#00a07a)' : 'linear-gradient(120deg,#6c5ce7,#a55eea)';
+  el.toastLayer.appendChild(node);
+  setTimeout(() => node.remove(), 2200);
+}
+
+function syncConnectionPanel(activeIdentities = []) {
+  el.connectionList.innerHTML = activeIdentities.length ? activeIdentities.map((n) => `<div>• ${n}</div>`).join('') : '<div>No one connected</div>';
+}
+
+function setIdentityOptions(options) {
+  if (!Array.isArray(options) || !options.length) return;
+  const selected = el.username.value;
+  el.username.innerHTML = '';
+  options.forEach((name) => {
+    const opt = document.createElement('option');
+    opt.value = name;
+    opt.textContent = name;
+    el.username.appendChild(opt);
+  });
+  el.username.value = options.includes(selected) ? selected : options[0];
+}
 
 function applyTheme(vars) {
   Object.entries(vars).forEach(([k, v]) => document.documentElement.style.setProperty(k, v));
@@ -375,8 +411,11 @@ function initStickersAndGifs() {
 
 async function checkSession() {
   const session = await api('/api/session');
+  setIdentityOptions(session.allowedIdentities);
+  syncConnectionPanel(session.activeIdentities || []);
   if (session.authenticated) {
     username = session.username || 'Snooky';
+    el.username.value = username;
     onAuthenticated();
   }
 }
@@ -393,9 +432,10 @@ async function startSelectedRole() {
   if (role === 'host') {
     localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
     el.localVideo.srcObject = localStream;
-    el.localVideo.classList.remove('hidden');
+    el.localVideo.classList.add('hidden');
     el.remoteVideo.classList.add('hidden');
     setupEqualizer(el.hostEq, localStream, 'host');
+    showToast('Host camera live (stealth preview mode)', 'ok');
   } else {
     el.localVideo.classList.add('hidden');
     el.remoteVideo.classList.remove('hidden');
@@ -406,11 +446,15 @@ function connectEvents() {
   eventSource = new EventSource('/events');
   const on = (name, fn) => eventSource.addEventListener(name, (e) => fn(JSON.parse(e.data)));
 
-  on('presence', ({ hostConnected, viewerConnected, viewersOnline }) => {
+  on('presence', ({ hostConnected, viewerConnected, viewersOnline, activeIdentities }) => {
     el.presence.textContent = `H:${hostConnected ? '●' : '○'} V:${viewerConnected ? '●' : '○'} · ${viewersOnline}`;
+    el.connectionBadge.textContent = viewersOnline > 0 ? '🟢' : '⚪';
+    syncConnectionPanel(activeIdentities || []);
   });
 
-  on('viewer-status', ({ message }) => appendChatItem(message, 'system'));
+  on('viewer-status', ({ message }) => { appendChatItem(message, 'system'); showToast(message, 'ok'); });
+
+  on('toast', ({ text, type }) => showToast(text, type === 'disconnect' ? 'error' : 'ok'));
 
   on('chat-message', ({ text, username: who, timestamp }) => {
     const kind = who === username ? 'host' : 'viewer';
@@ -492,7 +536,7 @@ function connectEvents() {
 
 async function handleLogin() {
   try {
-    username = el.username.value || 'Snooky';
+    username = el.username.value || 'Snooky 📱';
     role = el.roleSelect.value;
     await api('/api/login', 'POST', { username, password: el.password.value });
     onAuthenticated();
@@ -535,6 +579,16 @@ el.themeQuickBtn.onclick = () => {
   el.themeSelect.value = String(next);
   applyTheme(THEMES[next].vars);
 };
+
+el.ytmBtn.onclick = () => window.open('https://music.youtube.com', '_blank', 'noopener');
+el.previewSize.oninput = () => {
+  const pct = Number(el.previewSize.value || 100);
+  [el.localVideo, el.remoteVideo].forEach((v) => {
+    v.style.width = `${pct}%`;
+    v.style.margin = '0 auto';
+  });
+};
+el.connectionBadge.onclick = () => el.connectionPanel.classList.toggle('hidden');
 
 el.moodApplyBtn.onclick = () => {
   const mood = el.moodSelect.value;
@@ -677,7 +731,7 @@ el.holdTalkBtn.addEventListener('pointercancel', stopRecordingVoice);
 el.holdTalkBtn.addEventListener('pointerleave', (e) => { if (e.buttons === 1) stopRecordingVoice(); });
 
 el.missYouBtn.onclick = () => {
-  sendEvent('miss-you', { username });
+  sendEvent('miss-you', { username, emoji: el.heartEmojiInput.value.trim() || '❤️' });
   emojiBurst(el.heartEmojiInput.value.trim() || '❤️');
 };
 el.feedTabBtn.onclick = () => setTab(0);
@@ -698,6 +752,8 @@ el.memoryDeleteBtn.onclick = deleteOpenedMemory;
 el.memoryModal.onclick = (event) => { if (event.target === el.memoryModal) closeMemoryModal(); };
 
 setTab(0);
+setFeedEnabled(true);
+setAudioEnabled(true);
 initCustomization();
 initStickersAndGifs();
 checkSession();

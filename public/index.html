@@ -129,12 +129,12 @@
     </style>
   </head>
   <body>
-    <div class="topbar"><div class="brand">LoveLink</div><div id="presence" class="status">Loading...</div></div>
+    <div class="topbar"><div class="brand">LoveLink</div><button id="connectionBadge" class="btn btn-soft control-btn" title="Connections">🟢</button><div id="presence" class="status">Loading...</div></div>
 
     <section id="loginCard" class="login-screen">
       <div class="login-card">
         <h2 style="margin:0 0 10px;">Private Access</h2>
-        <input id="username" class="field" placeholder="Display name" value="Snooky" />
+        <select id="username" class="field"></select>
         <input id="password" class="field" type="password" placeholder="Password" />
         <select id="roleSelect" class="field"><option value="viewer">Viewer</option><option value="host">Host</option></select>
         <button id="loginBtn" class="btn btn-primary" style="width:100%;">Enter LoveLink</button>
@@ -155,13 +155,19 @@
       <div class="controls panel">
         <button id="captureBtn" class="btn btn-soft control-btn" title="Capture">📸</button>
         <button id="heartBtn" class="btn btn-soft control-btn" title="Send Heart">💖</button>
+        <button id="missYouBtn" class="btn btn-soft control-btn" title="Miss You">🥹</button>
         <button id="gifMainBtn" class="btn btn-soft control-btn" title="Send GIF">🎞️</button>
         <button id="toggleFeedBtn" class="btn btn-soft control-btn" title="Feed On/Off">📹</button>
         <button id="toggleAudioBtn" class="btn btn-soft control-btn" title="Audio On/Off">🔊</button>
         <button id="themeQuickBtn" class="btn btn-soft control-btn" title="Change Theme">🎨</button>
+        <button id="ytmBtn" class="btn btn-soft control-btn" title="YouTube Music">🎵</button>
         <div class="control-group">
           <span class="pill btn-soft">Heart</span>
           <input id="heartEmojiInput" class="field" style="margin:0;width:74px;padding:7px;" value="❤️" />
+        </div>
+        <div class="control-group">
+          <span class="pill btn-soft">Preview</span>
+          <input id="previewSize" type="range" min="55" max="100" value="100" style="width:90px;" />
         </div>
         <div class="control-group">
           <select id="moodSelect" class="field" style="margin:0;padding:7px;">
@@ -212,6 +218,14 @@
       <label style="display:flex;gap:8px;align-items:center;font-size:.85rem;color:var(--muted);"><input id="compactToggle" type="checkbox" /> Compact chat bubbles</label>
       <label style="display:flex;gap:8px;align-items:center;font-size:.85rem;color:var(--muted);margin-top:4px;"><input id="glassToggle" type="checkbox" checked /> Glassmorphism cards</label>
     </div>
+
+
+    <div id="connectionPanel" class="customize-panel hidden" style="left:10px;right:auto;bottom:70px;width:min(280px,80vw);">
+      <div style="font-size:.85rem;font-weight:700;margin-bottom:6px;">Connected identities</div>
+      <div id="connectionList" style="font-size:.8rem;color:var(--muted);"></div>
+    </div>
+
+    <div id="toastLayer" style="position:fixed;top:68px;left:10px;right:10px;z-index:70;display:grid;gap:6px;pointer-events:none;"></div>
 
     <script src="/main.js"></script>
   </body>
