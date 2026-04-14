@@ -281,6 +281,7 @@ Time capsule messages
 
 # Architecture Overview
 
+
 Prime (host PC)
 
 Responsibilities
