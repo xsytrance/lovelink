@@ -6,6 +6,9 @@ let eventSource = null;
 let openedMemory = null;
 let activeTab = 0;
 
+// Use LoveLinkConfig server URL if available (set by lovelink-config.js or Android native)
+const cfg = (typeof window !== 'undefined' && window.LoveLinkConfig) ? window.LoveLinkConfig : { serverUrl: '', resolve: (p) => p };
+
 function createClientId() {
   if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') return crypto.randomUUID();
   if (typeof crypto !== 'undefined' && typeof crypto.getRandomValues === 'function') {
@@ -49,9 +52,11 @@ const el = {
 };
 
 async function api(path, method = 'GET', body) {
-  const res = await fetch(path, {
+  const url = cfg.resolve(path);
+  const res = await fetch(url, {
     method,
     headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
     body: body ? JSON.stringify(body) : undefined
   });
   const data = await res.json();
@@ -139,7 +144,9 @@ async function startSelectedRole() {
 }
 
 function connectEvents() {
-  eventSource = new EventSource('/events');
+  // Use resolved URL for SSE (respects LOVE_LINK_SERVER_URL if set)
+  const eventsUrl = cfg.resolve('/events');
+  eventSource = new EventSource(eventsUrl, { withCredentials: true });
   const on = (name, fn) => eventSource.addEventListener(name, (e) => fn(JSON.parse(e.data)));
 
   on('presence', ({ hostConnected, viewerConnected, viewersOnline }) => {

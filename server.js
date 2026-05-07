@@ -6,6 +6,7 @@ const crypto = require('crypto');
 const url = require('url');
 
 const PORT = process.env.PORT || 3000;
+const HOST = process.env.HOST || '0.0.0.0';
 const PASSWORD = process.env.LOVE_LINK_PASSWORD || 'lovelink';
 const SESSION_SECRET = process.env.SESSION_SECRET || 'lovelink-secret';
 
@@ -20,7 +21,8 @@ const state = {
     viewerId: null,
     online: 0,
     usernames: {}
-  }
+  },
+  startTime: Date.now()
 };
 
 function getDb() {
@@ -35,8 +37,21 @@ async function saveDb(db) {
 }
 
 function json(res, code, payload) {
-  res.writeHead(code, { 'Content-Type': 'application/json' });
+  res.writeHead(code, {
+    'Content-Type': 'application/json',
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Methods': 'GET, POST, DELETE, OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type, Cookie',
+    'Access-Control-Allow-Credentials': 'true'
+  });
   res.end(JSON.stringify(payload));
+}
+
+function sendCorsHeaders(res) {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, DELETE, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Cookie');
+  res.setHeader('Access-Control-Allow-Credentials', 'true');
 }
 
 function parseCookies(req) {
@@ -113,15 +128,73 @@ function serveFile(reqPath, res) {
     '.html': 'text/html; charset=utf-8',
     '.js': 'application/javascript; charset=utf-8',
     '.css': 'text/css; charset=utf-8',
-    '.json': 'application/json; charset=utf-8'
+    '.json': 'application/json; charset=utf-8',
+    '.png': 'image/png',
+    '.jpg': 'image/jpeg',
+    '.jpeg': 'image/jpeg',
+    '.svg': 'image/svg+xml',
+    '.ico': 'image/x-icon',
+    '.webmanifest': 'application/manifest+json'
   }[ext] || 'application/octet-stream';
-  res.writeHead(200, { 'Content-Type': contentType });
+  res.writeHead(200, {
+    'Content-Type': contentType,
+    'Access-Control-Allow-Origin': '*'
+  });
   fs.createReadStream(filePath).pipe(res);
 }
 
 const server = http.createServer(async (req, res) => {
   const parsed = url.parse(req.url, true);
   const pathname = parsed.pathname;
+
+  // Handle CORS preflight
+  if (req.method === 'OPTIONS') {
+    sendCorsHeaders(res);
+    res.writeHead(204);
+    res.end();
+    return;
+  }
+
+  // Health check endpoint
+  if (pathname === '/health' && req.method === 'GET') {
+    res.writeHead(200, {
+      'Content-Type': 'application/json',
+      'Access-Control-Allow-Origin': '*'
+    });
+    res.end(JSON.stringify({
+      status: 'ok',
+      uptime: Date.now() - state.startTime,
+      presence: {
+        hostConnected: Boolean(state.presence.hostId),
+        viewerConnected: Boolean(state.presence.viewerId),
+        viewersOnline: state.presence.online
+      },
+      version: '1.0.0'
+    }));
+    return;
+  }
+
+  // API status endpoint
+  if (pathname === '/api/status' && req.method === 'GET') {
+    const db = getDb();
+    res.writeHead(200, {
+      'Content-Type': 'application/json',
+      'Access-Control-Allow-Origin': '*'
+    });
+    res.end(JSON.stringify({
+      ok: true,
+      server: 'LoveLink',
+      version: '1.0.0',
+      timestamp: Date.now(),
+      stats: {
+        moments: db.moments.length,
+        viewersOnline: state.presence.online,
+        hostConnected: Boolean(state.presence.hostId),
+        viewerConnected: Boolean(state.presence.viewerId)
+      }
+    }));
+    return;
+  }
 
   if (pathname === '/events' && req.method === 'GET') {
     const session = getSession(req);
@@ -264,6 +337,8 @@ const server = http.createServer(async (req, res) => {
   return json(res, 404, { error: 'Not found' });
 });
 
-server.listen(PORT, () => {
-  console.log(`LoveLink server running on http://localhost:${PORT}`);
+server.listen(PORT, HOST, () => {
+  console.log(`LoveLink server running on http://${HOST}:${PORT}`);
+  console.log(`Health check: http://${HOST}:${PORT}/health`);
+  console.log(`API status:   http://${HOST}:${PORT}/api/status`);
 });
