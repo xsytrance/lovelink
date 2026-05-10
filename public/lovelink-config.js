@@ -8,7 +8,7 @@
   // Default: empty string = use same-origin (works for web + localhost testing)
   // Override by setting window.LOVE_LINK_SERVER_URL before this script runs,
   // or by injecting the value from Android native code.
-  const DEFAULT_SERVER_URL = '';
+  const DEFAULT_SERVER_URL = 'https://prime.tail5a1fa3.ts.net:11370';
 
   window.LoveLinkConfig = {
     // Server URL for API calls. Empty string = same-origin.

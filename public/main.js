@@ -7,7 +7,20 @@ let openedMemory = null;
 let activeTab = 0;
 
 // Use LoveLinkConfig server URL if available (set by lovelink-config.js or Android native)
-const cfg = (typeof window !== 'undefined' && window.LoveLinkConfig) ? window.LoveLinkConfig : { serverUrl: '', resolve: (p) => p };
+// Harden fallback for Android/Capacitor so we never default to capacitor://localhost API paths.
+const isCapacitorRuntime = typeof window !== 'undefined' && typeof window.Capacitor !== 'undefined';
+const FALLBACK_SERVER_URL = 'https://prime.tail5a1fa3.ts.net:11370';
+const cfg = (typeof window !== 'undefined' && window.LoveLinkConfig)
+  ? window.LoveLinkConfig
+  : {
+      serverUrl: isCapacitorRuntime ? FALLBACK_SERVER_URL : '',
+      resolve: (p) => {
+        if (!(isCapacitorRuntime)) return p;
+        const base = FALLBACK_SERVER_URL.replace(/\/$/, '');
+        const rel = p.replace(/^\//, '');
+        return `${base}/${rel}`;
+      }
+    };
 
 function createClientId() {
   if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') return crypto.randomUUID();
